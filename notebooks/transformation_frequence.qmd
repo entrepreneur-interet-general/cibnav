@@ -1,0 +1,15 @@
+---
+title: "Transformation Fréquence"
+format: html
+---
+
+
+```{python imports}
+import dotenv
+from cibnav_archive.airflow_tasks.dags.helpers import connection_db
+```
+
+
+```{python setup}
+dotenv.load_dotenv()
+```
