@@ -3,6 +3,9 @@ name = "cibnav"
 version = "0.1.0"
 description = ""
 authors = ["Quentin Loridant <quentin.loridant@multi.coop>", "Pierre Camilleri <pierre.camilleri@multi.coop>"]
+packages = [
+    { include = "src"},
+]
 
 [tool.poetry.dependencies]
 python = "^3.9"

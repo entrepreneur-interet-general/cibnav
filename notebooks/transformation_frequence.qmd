@@ -6,10 +6,16 @@ format: html
 
 ```{python imports}
 import dotenv
-from cibnav_archive.airflow_tasks.dags.helpers import connection_db
+from src.dags.helpers import connection_db
+import pandas
 ```
 
 
 ```{python setup}
 dotenv.load_dotenv()
+```
+
+
+```{python data}
+engine = connection_db()
 ```
