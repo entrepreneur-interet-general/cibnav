@@ -6,8 +6,8 @@ format: html
 
 ```{python imports}
 import dotenv
+import pandas as pd
 from src.dags.helpers import connection_db
-import pandas
 ```
 
 
@@ -15,7 +15,9 @@ import pandas
 dotenv.load_dotenv()
 ```
 
-
-```{python data}
+```{python db_connection}
 engine = connection_db()
+
+score = pd.read_sql("select * from score_v3", engine)
+
 ```
