@@ -1,0 +1,37 @@
+# WIP
+
+* Gestion des secrets et des accès :  qu'est-ce-qu'il se passe si nous quittons le projet ?
+* Regarder la mise-à-jour de sitrep avec un connecteur SEAMIS
+
+# Backlog
+
+## Déploiement
+
+* [ ] Debug écriture des SITREP en base
+  * On pense que c'est au moment de "to_csv" que ça ne fonctionne pas bien dans `airflow tasks test sitrep_web_postgre telechargement_sitrep`
+  * Un test manuel d'écriture avec la même config lancé depuis python a l'air de fonctionner.
+
+
+* [ ] Gérer le déploiemnt avec la DSI
+
+### Mini refactos
+
+* [ ] Update documentation for pg_dump
+* [ ] Update secmar_filter_path en secmar_filter_file
+
+### Si on a le temps
+
+* [ ] Dockeriser Airflow
+  * docker-compose existe pour airflow : peut-on utiliser des dc en cascade ?
+* [ ] Gérer la config de l'adresse IP de la base postgre pour le connecteur metabase
+* [ ] Modifier la config metabase (idéalement directement sur le serveur).
+* [ ] Ne pas lancer systématiquement l'import du setup de metabase
+
+## Itérations data :
+
+* 2x5 jours :
+  * [ ] Vérifier qu'on peut continuer à travailler avec les données SITREP (màj manuelle de la base au besoin)
+  * [ ] Identifier les "faisceaux d'indices"
+  * [ ] Conversion du score en fréquence
+  * [ ] Mettre le jour à metabase avec ces nouvelles informations
+  * [ ] Vérifier la cohérence et la validité du modèle

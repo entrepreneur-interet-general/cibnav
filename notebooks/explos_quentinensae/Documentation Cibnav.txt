@@ -1,0 +1,26 @@
+Cibnav est un projet visant à hierarchiser les bateaux en fonctions de leur niveau de risque.
+
+Type de problème :
+Classification.
+Deux cibles sont implémentées :
+- la présence d'au moins une prescription majeure
+- la présence d'au moins une préscription majeure ou au moins 4 mineurs
+
+Les fichiers présents :
+- Gestion des données.ipynb : C'est le fichier de prétraitement des données.
+- Apprentissage supervisé.ipynb : C'est le fichier où l'on explore différents modèles
+de ML.
+- Gestion des données et Apprentissage.ipynb : Ce fichier est la version finale de
+Cibnav.
+Il présente la partie gestion des données.
+Et le modèle selectionné.
+Les commentaires et les analyses sont moins poussées sur ce fichier.
+- pondération.ipynb : Ce fichier présente la fonction de pondération utilisée
+dans la partie apprentissage supervisée
+- Statistiques descriptives.ipynb : Ce fichier présente quelques statistiques
+descriptives autour des données.
+
+Pistes d'améliorations :
+- Rajouter des données :
+- Faire du clustering sur les navires pour les regrouper et faire un modèle
+sur chacun d'eux.

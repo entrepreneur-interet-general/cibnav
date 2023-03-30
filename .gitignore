@@ -1,0 +1,8 @@
+debug.log
+.idea
+.ipynb_checkpoints
+.env
+.env.server
+/dump
+docker
+__pycache__

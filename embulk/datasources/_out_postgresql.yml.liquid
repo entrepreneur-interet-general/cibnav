@@ -1,0 +1,22 @@
+out:
+  type: postgresql
+  host: {{env.EMBULK_POSTGRESQL_HOST}}
+  user: {{env.EMBULK_POSTGRESQL_USER}}
+  password: {{env.EMBULK_POSTGRESQL_PASSWORD}}
+  database: {{env.EMBULK_POSTGRESQL_DATABASE}}
+  mode: replace # Switch to merge when table is stable ? 
+  merge_keys: [{{env.EMBULK_ID_MERGE}}]
+  table: {{env.EMBULK_TABLE_NAME}}
+  column_options:
+    {{env.EMBULK_ID_MERGE}}: {type: 'INTEGER PRIMARY KEY'}
+    date_debut_pa_peche_culture: {type: date, timezone: 'Europe/Paris'}
+    date_fin_pa_peche_culture: {type: date, timezone: 'Europe/Paris'}
+    date_debut_pa_commerce: {type: date, timezone: 'Europe/Paris'}
+    date_fin_pa_commerce: {type: date, timezone: 'Europe/Paris'}
+    expiration_franc_bord: {type: date, timezone: 'Europe/Paris'}
+
+# This configuration converts all lower-case alphabets to upper-case.
+filters:
+  - type: rename
+    rules:
+    - rule: upper_to_lower
