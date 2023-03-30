@@ -1,16 +1,16 @@
 # WIP
 
-* Gestion des secrets et des accès :  qu'est-ce-qu'il se passe si nous quittons le projet ?
+* Gestion des secrets et des accès :  qu'est-ce-qu'il se passe si nous quittons
+  le projet ?
 * Regarder la mise-à-jour de sitrep avec un connecteur SEAMIS
+* Le déploiement devrait être automatisé, et les bonnes variables
+  d'environnement définis dans cette procédure.
+  * Supprimer le `load_dotenv()` des scripts qui l'utilisent : les variables
+    d'environnements devraient être de la responsabilité de l'appelant.
 
 # Backlog
 
 ## Déploiement
-
-* [ ] Debug écriture des SITREP en base
-  * On pense que c'est au moment de "to_csv" que ça ne fonctionne pas bien dans `airflow tasks test sitrep_web_postgre telechargement_sitrep`
-  * Un test manuel d'écriture avec la même config lancé depuis python a l'air de fonctionner.
-
 
 * [ ] Gérer le déploiemnt avec la DSI
 
