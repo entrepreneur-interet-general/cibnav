@@ -34,7 +34,7 @@ then
 
   echo "🗂️ Importing database... In case of failure, clean the database with scripts/drop_data_db.sh"
   (pg_restore --host postgres --port 5432 --username metabase --dbname metabase --schema public --exit-on-error ./dump/metabase.tar) 2>&1 | indent
-  echo "Data import DONE"
+  echo "Config import DONE"
 
 else
   echo "🔍 Database \"metabase\" already exists."
