@@ -1,0 +1,12 @@
+libais
+psycopg2
+pandas
+sqlalchemy
+apache-airflow
+interpret
+setuptools
+numpy
+scipy
+pyscaffold
+python-dotenv
+requests

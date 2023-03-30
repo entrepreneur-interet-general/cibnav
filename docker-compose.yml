@@ -1,0 +1,82 @@
+version: "3"
+services:
+  postgres:
+    image: postgres:15.2-alpine
+    volumes:
+      - ./docker/postgres/data:/var/lib/postgresql/data:rw
+      - ./dump:/home/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      - POSTGRES_PASSWORD
+      - PGDATA=/var/lib/postgresql/data/pgdata
+      - PGUSER=postgres
+    ports:
+      - 6542:5432
+  metabase:
+    image: metabase/metabase:v0.45.0
+    depends_on:
+      postgres-mb-setup:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    ports:
+      - 3000:3000
+    environment:
+      - MB_DB_TYPE=postgres
+      - MB_DB_DBNAME=metabase
+      - MB_DB_PORT=5432
+      - MB_DB_USER=metabase
+      - MB_DB_PASS=${MB_POSTGRES_PASSWORD}
+      - MB_DB_HOST=mb-postgres
+  mb-postgres:
+    image: postgres:15.2-alpine
+    volumes:
+      - ./docker/mb-postgres/data:/var/lib/postgresql/data:rw
+      - ./dump:/home/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      - POSTGRES_PASSWORD=${MB_POSTGRES_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+      - PGUSER=postgres
+    ports:
+      - 6543:5432
+
+  postgres-mb-setup:
+    image: postgres:15.2-alpine
+    volumes:
+      - ./docker/postgres/data:/var/lib/postgresql/data:rw
+      - ./dump:/home/data
+    depends_on:
+      mb-postgres:
+        condition: service_healthy
+    restart: "no"
+    entrypoint:
+      [
+        "bash",
+        "-c",
+        "export PGPASSWORD='postgres' && psql -h mb-postgres -p 5432 -U postgres -c 'DROP DATABASE IF EXISTS metabase;' -c \"CREATE USER metabase WITH PASSWORD '$MB_POSTGRES_PASSWORD';\" -c 'CREATE DATABASE metabase OWNER metabase;' && pg_restore --host mb-postgres --port 5432 --username metabase --dbname metabase --schema public --exit-on-error /home/data/metabase.tar"
+      ]
+
+  postgres-data-setup:
+    image: postgres:15.2-alpine
+    volumes:
+      - ./docker/postgres/data:/var/lib/postgresql/data:rw
+      - .:/home/
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    entrypoint:
+      [
+        "bash",
+        "-c",
+        "cd /home && ./scripts/setup_postgres_data.sh"
+      ]
