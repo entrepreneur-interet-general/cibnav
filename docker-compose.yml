@@ -19,7 +19,7 @@ services:
   metabase:
     image: metabase/metabase:v0.45.0
     depends_on:
-      postgres-mb-setup:
+      mb-postgres-setup:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
