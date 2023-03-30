@@ -7,6 +7,8 @@
   d'environnement définis dans cette procédure.
   * Supprimer le `load_dotenv()` des scripts qui l'utilisent : les variables
     d'environnements devraient être de la responsabilité de l'appelant.
+* Lancer le make export-mb-config depuis le conteneur
+
 
 * Organiser et documenter l'organisation des fichiers (doc de travails, livrables...)
 
@@ -20,14 +22,14 @@
 
 * [ ] Update documentation for pg_dump
 * [ ] Update secmar_filter_path en secmar_filter_file
+* [ ] Ne pas ajouter l'extension citext pour la base cibnav
 
 ### Si on a le temps
 
 * [ ] Dockeriser Airflow
   * docker-compose existe pour airflow : peut-on utiliser des dc en cascade ?
 * [ ] Gérer la config de l'adresse IP de la base postgre pour le connecteur metabase
-* [ ] Modifier la config metabase (idéalement directement sur le serveur).
-* [ ] Ne pas lancer systématiquement l'import du setup de metabase
+* [X] Ne pas lancer systématiquement l'import du setup de metabase
 
 ## Itérations data :
 
