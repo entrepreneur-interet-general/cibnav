@@ -1,3 +1,4 @@
+<img src="https://eig.etalab.gouv.fr/img/eig3-cibnav.svg" width="250"/>
 
 ## Data Engineering For CibNav
 
