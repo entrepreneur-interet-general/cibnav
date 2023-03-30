@@ -10,8 +10,6 @@ function indent {
 }
 
 
-# Load environment variables
-set -o allexport && . .env && set +o allexport
 export PGPASSWORD="${POSTGRES_PASSWORD}"
 
 USER="${EMBULK_POSTGRESQL_USER}"

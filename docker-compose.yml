@@ -26,6 +26,7 @@ services:
     ports:
       - 3000:3000
     environment:
+      # Metabase application database configuration
       - MB_DB_TYPE=postgres
       - MB_DB_DBNAME=metabase
       - MB_DB_PORT=5432
@@ -74,6 +75,11 @@ services:
       postgres:
         condition: service_healthy
     restart: "no"
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - EMBULK_POSTGRESQL_USER=cibnav
+      - EMBULK_POSTGRESQL_HOST=postgres
+      - EMBULK_POSTGRESQL_PORT=5432
     entrypoint:
       [
         "bash",
