@@ -50,7 +50,7 @@ services:
     ports:
       - 6543:5432
 
-  postgres-mb-setup:
+  mb-postgres-setup:
     image: postgres:15.2-alpine
     volumes:
       - ./docker/postgres/data:/var/lib/postgresql/data:rw
