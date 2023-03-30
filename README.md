@@ -1,5 +1,3 @@
-> **Warning**
-> Projet en cours d'archivage. Se reporter au [nouveau repo](https://github.com/entrepreneur-interet-general/cibnav).
 
 ## Data Engineering For CibNav
 
