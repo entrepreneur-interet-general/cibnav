@@ -28,11 +28,15 @@ create_or_import_database() {
     (
     psql -h "${HOST}" -p "${PORT}" -U postgres \
       -c "CREATE USER ${USER} WITH PASSWORD '${PGPASSWORD}';" \
-      -c "CREATE DATABASE ${DB} OWNER ${USER};"
+      -c "CREATE DATABASE ${DB} OWNER ${USER};" \
+      -c "CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public;" 
         ) 2>&1 | indent
     echo "Database creation DONE"
 
     echo "🗂️ Importing database... In case of failure, clean the database with scripts/drop_data_db.sh"
+    (psql -h "${HOST}" -p "${PORT}" -U "${USER}"\
+      -c "CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public;" 
+        ) 2>&1 | indent
     (pg_restore --host "${HOST}" --port "${PORT}" --username "${USER}" --dbname "${DB}" --schema public --exit-on-error ./dump/"${DB}".tar) 2>&1 | indent
     echo "Import DONE"
 
