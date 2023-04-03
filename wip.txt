@@ -29,6 +29,7 @@
 * [ ] Dockeriser Airflow
   * docker-compose existe pour airflow : peut-on utiliser des dc en cascade ?
 * [ ] Gérer la config de l'adresse IP de la base postgre pour le connecteur metabase
+* [ ] Automatiser le nom du directory dans les regles de dump du Makefile
 * [X] Ne pas lancer systématiquement l'import du setup de metabase
 
 ## Itérations data :
