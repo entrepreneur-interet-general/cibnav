@@ -8,6 +8,8 @@
   * Supprimer le `load_dotenv()` des scripts qui l'utilisent : les variables
     d'environnements devraient être de la responsabilité de l'appelant.
 
+* Organiser et documenter l'organisation des fichiers (doc de travails, livrables...)
+
 # Backlog
 
 ## Déploiement
