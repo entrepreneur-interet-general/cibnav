@@ -19,7 +19,7 @@ services:
   metabase:
     image: metabase/metabase:v0.45.0
     depends_on:
-      postgres-mb-setup:
+      mb-postgres-setup:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
@@ -50,11 +50,11 @@ services:
     ports:
       - 6543:5432
 
-  postgres-mb-setup:
+  mb-postgres-setup:
     image: postgres:15.2-alpine
     volumes:
       - ./docker/postgres/data:/var/lib/postgresql/data:rw
-      - ./dump:/home/data
+      - .:/home
     depends_on:
       mb-postgres:
         condition: service_healthy
@@ -63,7 +63,7 @@ services:
       [
         "bash",
         "-c",
-        "export PGPASSWORD='postgres' && psql -h mb-postgres -p 5432 -U postgres -c 'DROP DATABASE IF EXISTS metabase;' -c \"CREATE USER metabase WITH PASSWORD '$MB_POSTGRES_PASSWORD';\" -c 'CREATE DATABASE metabase OWNER metabase;' && pg_restore --host mb-postgres --port 5432 --username metabase --dbname metabase --schema public --exit-on-error /home/data/metabase.tar"
+        "cd /home && source /home/scripts/setup_db.sh && create_or_import_database mb-postgres 5432 metabase metabase ${MB_POSTGRES_PASSWORD}"
       ]
 
   postgres-data-setup:
@@ -75,14 +75,9 @@ services:
       postgres:
         condition: service_healthy
     restart: "no"
-    environment:
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - EMBULK_POSTGRESQL_USER=cibnav
-      - EMBULK_POSTGRESQL_HOST=postgres
-      - EMBULK_POSTGRESQL_PORT=5432
     entrypoint:
       [
         "bash",
         "-c",
-        "cd /home && ./scripts/setup_postgres_data.sh"
+        "cd /home && source /home/scripts/setup_db.sh && create_or_import_database postgres 5432 cibnav cibnav ${POSTGRES_PASSWORD}"
       ]
