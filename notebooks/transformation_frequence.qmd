@@ -1,0 +1,38 @@
+---
+title: "Transformation Fréquence"
+format: html
+---
+
+
+```{python imports}
+import dotenv
+import pandas as pd
+from src.dags.helpers import connection_db
+```
+
+
+```{python setup}
+dotenv.load_dotenv()
+```
+
+```{python db_connection}
+engine = connection_db()
+
+score = pd.read_sql("select * from score_v3", engine)
+```
+
+
+
+```{python distribution}
+score.probabilite.hist()
+```
+
+Nous cherchons à réduire de 20% le nombre de visites annuelles
+La distribution du score a une forme de gaussienne.
+
+
+```{python}
+threshold = score.probabilite.quantile(0.4)
+score['frequency'] = score.probabilite.apply(lambda x: 2 if x < threshold else 1)
+score['frequency_max'] = score.probabilite.apply(lambda x: 2.5 if x < threshold else 1.5)
+```

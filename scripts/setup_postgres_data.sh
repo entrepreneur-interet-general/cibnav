@@ -32,7 +32,7 @@ then
   echo "Database creation DONE"
 
   echo "🗂️ Importing database... In case of failure, clean the database with scripts/drop_data_db.sh"
-  (pg_restore --host postgres --port 5432 --username cibnav --dbname cibnav --schema public --exit-on-error ./dump/cibnav.tar) 2>&1 | indent
+  (pg_restore --host "${HOST}" --port "${PORT}" --username "${USER}" --dbname cibnav --schema public --exit-on-error ./dump/cibnav.tar) 2>&1 | indent
   echo "Data import DONE"
 
 else
