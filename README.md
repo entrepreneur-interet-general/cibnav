@@ -82,3 +82,13 @@ airflow users create --username admin --firstname F --lastname L --role Admin --
   d'environnement.
   
 - Lancer airflow avec `make run-airflow`.
+
+### Python en local
+
+Nous utilisons l'outil poetry pour gérer les dépendances et le packaging.
+
+- [Installer poetry](https://python-poetry.org/docs/#installation) au besoin
+- Installer les dépendances avec poetry `poetry install`
+- Activer le shell `poetry shell`
+- Installer le reste des dépendances (notamment airflow qui ne supporte pas 
+  poetry) via `pip install -r requirements.txt`
