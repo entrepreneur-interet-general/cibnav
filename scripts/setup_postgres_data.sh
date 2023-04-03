@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-######################################
-# Must be used in docker environment
-######################################
-
-
 # script setup
 set -e # will stop the script if any command fails with a non-zero exit code
 set -o pipefail # ... even for tests which pipe their output to indent
@@ -17,9 +12,9 @@ function indent {
 
 export PGPASSWORD="${POSTGRES_PASSWORD}"
 
-USER=cibnav
-HOST=postgres ## Name of the service in the docker compose
-PORT=5432
+USER="${EMBULK_POSTGRESQL_USER}"
+HOST="${EMBULK_POSTGRESQL_HOST}"
+PORT="${EMBULK_POSTGRESQL_PORT}"
 
 # Check if database already exists
 DBEXISTS=$(psql -U postgres -h "${HOST}" --tuples-only -c "SELECT datname FROM pg_catalog.pg_database WHERE datname='cibnav'")
