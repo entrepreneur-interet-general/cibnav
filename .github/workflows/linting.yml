@@ -10,7 +10,7 @@ jobs:
       - name: Check code format against black
         uses: psf/black@stable
         with:
-          src: "./airflow_tasks/dags/sitrep_web_postgre.py"
+          src: "./src/dags/sitrep_web_postgre.py"
       - uses: actions/setup-python@v2
         with:
           python-version: 3.8
@@ -18,8 +18,8 @@ jobs:
         uses: isort/isort-action@master
         with:
           requirementsFiles: "requirements.txt"
-          sortPaths: "./airflow_tasks/dags/sitrep_web_postgre.py"
+          sortPaths: "./src/dags/sitrep_web_postgre.py"
       - name: Flake8 lint
         uses: py-actions/flake8@v2
         with:
-          path: "./airflow_tasks/dags/sitrep_web_postgre.py"
+          path: "./src/dags/sitrep_web_postgre.py"
