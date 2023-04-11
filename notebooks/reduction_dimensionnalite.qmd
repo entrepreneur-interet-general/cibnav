@@ -62,7 +62,7 @@ df = pd.DataFrame(df)
 ```
 
 ```{python umap}
-mapper = umap.UMAP().fit(df)
+mapper = umap.UMAP(random_state=42).fit(df)
 ```
 
 ```{python umap_plot}
@@ -74,9 +74,30 @@ umap.plot.points(mapper, labels=df_raw.cible, color_key={1: 'blue', 0: 'yellow'}
 #   'nombre_prescriptions_hist': df_raw.nombre_prescriptions_hist
 # })
 
-p = umap.plot.points(mapper, values=df_raw.age, theme='fire')
+p = umap.plot.points(mapper, values=df_raw.age, cmap='RdYlGn_r', background='white')
+umap.plot.show(p)
+p = umap.plot.points(mapper, values=df_raw.nombre_prescriptions_hist, cmap='RdYlGn_r', background='white')
+umap.plot.show(p)
+p = umap.plot.points(mapper, values=df_raw.longueur_hors_tout, cmap='RdYlGn_r', background='white')
+umap.plot.show(p)
+p = umap.plot.points(mapper, values=df_raw.jauge_oslo, cmap='RdYlGn_r', background='white')
+umap.plot.show(p)
+p = umap.plot.points(mapper, values=df_raw.nombre_moteur, cmap='RdYlGn_r', background='white')
+umap.plot.show(p)
+p = umap.plot.points(mapper, values=df_raw.puissance_administrative, cmap='RdYlGn_r', background='white')
 umap.plot.show(p)
 
-p = umap.plot.points(mapper, values=df[5], theme='inferno')
-umap.plot.show(p)
 ```
+
+## Observations : 
+4 îlots dont un grand et 3 petits (Grand = 1, puis dans notons les autres dans le sens horaire, jusqu'à 4)
+Quelques valeurs ne sont rattachés à aucun îlot
+L'ilôt le plus à gauche a des excroissances quasi indépendantes
+Îlot 1 : Plus nous allons à droite, plus nous sommes dans la cible. Pareil en allant vers le haut
+Îlot 2 : Plus nous allons vers la gauche, plus nous sommes dans la cible
+Îlot 3 : Excroissance en bas est bine dans la cible
+Îlot 4 : majoritairement dans la cible
+
+Nous observons égalmeent deux mini îlots. Celui de droit est rattachée à la cible.
+
+Hypothèse : L'îlot 4 a un lien avec le nombre de prescriptions historique
