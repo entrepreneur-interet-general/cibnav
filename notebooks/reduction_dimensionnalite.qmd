@@ -89,15 +89,47 @@ umap.plot.show(p)
 
 ```
 
-## Observations : 
+## Observations :
+
+### Par rapport à la cible
+
 4 îlots dont un grand et 3 petits (Grand = 1, puis dans notons les autres dans le sens horaire, jusqu'à 4)
 Quelques valeurs ne sont rattachés à aucun îlot
 L'ilôt le plus à gauche a des excroissances quasi indépendantes
-Îlot 1 : Plus nous allons à droite, plus nous sommes dans la cible. Pareil en allant vers le haut
-Îlot 2 : Plus nous allons vers la gauche, plus nous sommes dans la cible
-Îlot 3 : Excroissance en bas est bine dans la cible
-Îlot 4 : majoritairement dans la cible
+Îlot 1 : Plus nous allons à gauche, plus nous sommes dans la cible. Pareil en allant vers le bas
+Îlot 2 : Plus nous allons vers la droite, plus nous sommes dans la cible
+Îlot 3 : Excroissance en bas est peu dans la cible
+Îlot 4 : majoritairement hors de la cible
 
-Nous observons égalmeent deux mini îlots. Celui de droit est rattachée à la cible.
+Nous observons égalmeent au nord deux mini îlots. Celui de gauche est rattachée à la cible.
 
-Hypothèse : L'îlot 4 a un lien avec le nombre de prescriptions historique
+### Par rapport à l'âge
+
+Deux clusters de navires particulièrement âgés :
+
+- 1 : excroissance au sud de l'îlot 1
+- 2 : Entre îlots 3 et 4
+
+On observe des dégradés très marqués sur chaque îlot, pas forcément orienté dans le même sens.
+
+
+### Longueur hors tout
+
+Dégradé du centre vers l'extérieur (des plus grands vers les plus petits).
+
+- Cluster 3 qui est assez particulier : excroissance nord exclusivement avec
+  de grands navires.
+- On retrouve ça également sur une excroissance gauche de l'ilôt 4.
+- Mini îlot nord-ouest de grands navires. Idem à l'est de l'ilôt 3.
+- Les plus petits navires ne sont présents que sur l'ilôt 1 et légèrement 2
+
+### Nombre prescriptions
+
+
+* Îlot 1 et 4 sont sur des valeurs basses (quelques tâches plus claires)
+
+* Îlot 2, dégradé léger de prescriptions (+ en + vers la droite)
+
+* Îlot 3, valeurs assez importantes, concentration au nord de valeurs importantes
+
+* Excroissance nord : dégradé du min (nord) au max (sud)
