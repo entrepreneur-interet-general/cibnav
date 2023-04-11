@@ -1,0 +1,69 @@
+---
+title: "Transformation Fréquence"
+format: html
+---
+
+
+```{python imports}
+from src.dags.helpers import connection_db
+import dotenv
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import umap
+import umap.plot
+
+# Interactive mode
+plt.ion()
+```
+
+```{python setup}
+dotenv.load_dotenv(override=True)
+```
+
+```{python db_connection}
+engine = connection_db()
+df_raw = pd.read_sql("select * from dataset_train", engine)
+```
+
+```{python filter_rows}
+df_raw = df_raw[df_raw.annee_visite <= 2021]
+```
+
+```{python filter_cols}
+# df.columns.values.tolist()
+df = df_raw[[
+  "longueur_hors_tout",
+  "jauge_oslo",
+  "nombre_moteur",
+  # "num_version",
+  "puissance_administrative",
+  # "sitrep_history",
+  # "delai_visites",
+  "age",
+  # "nombre_prescriptions_hist",
+  # "nombre_prescriptions_majeurs_hist"
+]]
+```
+
+```{python deal_with_nan}
+df.isna().sum()
+df.jauge_oslo = df.jauge_oslo.fillna(df.jauge_oslo.mode().at[0])
+df.nombre_moteur = df.nombre_moteur.fillna(df.nombre_moteur.mode().at[0])
+df.puissance_administrative = df.puissance_administrative.fillna(df.puissance_administrative.mode().at[0])
+```
+
+
+```{python umap}
+embedding = umap.UMAP().fit_transform(df)
+```
+
+```{python umap_plot}
+plt.scatter(
+  embedding[:, 0],
+  embedding[:, 1],
+  c=[sns.color_palette()[x] for x in df_raw["cible"]]
+ )
+plt.gca().set_aspect('equal', 'datalim')
+```
