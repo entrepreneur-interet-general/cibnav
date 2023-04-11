@@ -58,6 +58,7 @@ df.puissance_administrative = df.puissance_administrative.fillna(df.puissance_ad
 ```{python normalize_data}
 scaler = preprocessing.StandardScaler()
 df = scaler.fit_transform(df)
+df = pd.DataFrame(df)
 ```
 
 ```{python umap}
@@ -67,8 +68,15 @@ mapper = umap.UMAP().fit(df)
 ```{python umap_plot}
 umap.plot.points(mapper, labels=df_raw.cible, color_key={1: 'blue', 0: 'yellow'})
 
-hover_data = pd.DataFrame({'index':np.arange(len(df_raw)), 'age':df_raw.age})
+# hover_data = pd.DataFrame({
+#   'index': df_raw.index,
+#   'age':df_raw.age,
+#   'nombre_prescriptions_hist': df_raw.nombre_prescriptions_hist
+# })
 
-p = umap.plot.interactive(mapper, values=df_raw.age, theme='fire', hover_data=hover_data, point_size=2)
+p = umap.plot.points(mapper, values=df_raw.age, theme='fire')
+umap.plot.show(p)
+
+p = umap.plot.points(mapper, values=df[5], theme='inferno')
 umap.plot.show(p)
 ```
