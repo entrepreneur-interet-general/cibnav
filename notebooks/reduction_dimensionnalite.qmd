@@ -77,14 +77,15 @@ umap.plot.points(mapper, labels=df_raw.cible, color_key={1: 'blue', 0: 'yellow'}
 p = umap.plot.points(mapper, values=df_raw.age, cmap='RdYlGn_r', background='white')
 umap.plot.show(p)
 p = umap.plot.points(mapper, values=df_raw.nombre_prescriptions_hist, cmap='RdYlGn_r', background='white')
+p = umap.plot.points(mapper, values=df_raw.nombre_prescriptions_majeurs_hist, cmap='RdYlGn_r', background='white')
 umap.plot.show(p)
 p = umap.plot.points(mapper, values=df_raw.longueur_hors_tout, cmap='RdYlGn_r', background='white')
 umap.plot.show(p)
-p = umap.plot.points(mapper, values=df_raw.jauge_oslo, cmap='RdYlGn_r', background='white')
+p = umap.plot.points(mapper, values=np.log(df_raw.jauge_oslo), cmap='RdYlGn_r', background='white')
 umap.plot.show(p)
 p = umap.plot.points(mapper, values=df_raw.nombre_moteur, cmap='RdYlGn_r', background='white')
 umap.plot.show(p)
-p = umap.plot.points(mapper, values=df_raw.puissance_administrative, cmap='RdYlGn_r', background='white')
+p = umap.plot.points(mapper, values=np.log(df_raw.puissance_administrative), cmap='RdYlGn_r', background='white')
 umap.plot.show(p)
 
 ```
@@ -119,8 +120,8 @@ Dégradé du centre vers l'extérieur (des plus grands vers les plus petits).
 
 - Cluster 3 qui est assez particulier : excroissance nord exclusivement avec
   de grands navires.
-- On retrouve ça également sur une excroissance gauche de l'ilôt 4.
-- Mini îlot nord-ouest de grands navires. Idem à l'est de l'ilôt 3.
+- On retrouve ça également sur une excroissance gauche de l'îlot 4.
+- Mini îlot nord-ouest de grands navires. Idem à l'est de l'îlot 3.
 - Les plus petits navires ne sont présents que sur l'ilôt 1 et légèrement 2
 
 ### Nombre prescriptions
@@ -133,3 +134,26 @@ Dégradé du centre vers l'extérieur (des plus grands vers les plus petits).
 * Îlot 3, valeurs assez importantes, concentration au nord de valeurs importantes
 
 * Excroissance nord : dégradé du min (nord) au max (sud)
+
+### Nombre prescriptions majeures
+
+* Dégradé de la droite vers la gauche
+* Petite pointe de valeurs extrêmes au nord de l'îlot 3 
+
+### Jauge oslo
+
+* Passage en logarithme à cause de valeurs extrêmes
+* Même phénomène concentrique que la longueur, on peut supposer une forte corrélation
+* Au nord de l'îlot 1, on observe une concentration discrète de valeurs de faible capacité
+
+### Nombre de moteurs
+
+* On observe aucune variation
+* Dans les données nous observons des valeurs suspectes : 96 et 250. A investiguer !
+
+### Puissance administrative
+
+* Corrélation avec la longueur et la jauge oslgo (même dynamique concentrique)
+* On observe des différences, notemment dans l'excroissance droite de l'îlot 3 et sur l'îlot 4
+* On suppose qu'il s'agit de navires avec des puissances plus importantes par rapport à leur taille
+* Hypothèse : A taille égale, les navires avec une puissance administrative plus importantes sont moins dans la cible.
