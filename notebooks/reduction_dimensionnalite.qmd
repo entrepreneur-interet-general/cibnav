@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from sklearn import preprocessing
 import umap
 import umap.plot
 
@@ -42,8 +43,8 @@ df = df_raw[[
   # "sitrep_history",
   # "delai_visites",
   "age",
-  # "nombre_prescriptions_hist",
-  # "nombre_prescriptions_majeurs_hist"
+  "nombre_prescriptions_hist",
+  "nombre_prescriptions_majeurs_hist"
 ]]
 ```
 
@@ -54,12 +55,17 @@ df.nombre_moteur = df.nombre_moteur.fillna(df.nombre_moteur.mode().at[0])
 df.puissance_administrative = df.puissance_administrative.fillna(df.puissance_administrative.mode().at[0])
 ```
 
+```{python normalize_data}
+scaler = preprocessing.StandardScaler()
+df = scaler.fit_transform(df)
+```
 
 ```{python umap}
-embedding = umap.UMAP().fit_transform(df)
+mapper = umap.UMAP().fit(df)
 ```
 
 ```{python umap_plot}
+umap.plot.points(mapper, labels=df_raw.cible)
 plt.scatter(
   embedding[:, 0],
   embedding[:, 1],
