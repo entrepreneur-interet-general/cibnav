@@ -65,11 +65,10 @@ mapper = umap.UMAP().fit(df)
 ```
 
 ```{python umap_plot}
-umap.plot.points(mapper, labels=df_raw.cible)
-plt.scatter(
-  embedding[:, 0],
-  embedding[:, 1],
-  c=[sns.color_palette()[x] for x in df_raw["cible"]]
- )
-plt.gca().set_aspect('equal', 'datalim')
+umap.plot.points(mapper, labels=df_raw.cible, color_key={1: 'blue', 0: 'yellow'})
+
+hover_data = pd.DataFrame({'index':np.arange(len(df_raw)), 'age':df_raw.age})
+
+p = umap.plot.interactive(mapper, values=df_raw.age, theme='fire', hover_data=hover_data, point_size=2)
+umap.plot.show(p)
 ```
