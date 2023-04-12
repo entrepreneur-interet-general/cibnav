@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "vuepress": "^1.8.0",
-    "vuepress-theme-gouv-fr": "*"
-  }
-}
