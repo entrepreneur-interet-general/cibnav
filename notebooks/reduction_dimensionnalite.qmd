@@ -49,7 +49,9 @@ df = df_raw[[
 ```
 
 ```{python deal_with_nan}
-df.isna().sum()
+print(df.isna().sum())
+df.jauge_oslo_imputee = df.jauge_oslo.apply(lambda x: 1 if np.isnan(x) else 0)
+df.puissance_administrative_imputee = df.puissance_administrative.apply(lambda x: 1 if np.isnan(x) else 0)
 df.jauge_oslo = df.jauge_oslo.fillna(df.jauge_oslo.mode().at[0])
 df.nombre_moteur = df.nombre_moteur.fillna(df.nombre_moteur.mode().at[0])
 df.puissance_administrative = df.puissance_administrative.fillna(df.puissance_administrative.mode().at[0])
@@ -77,11 +79,13 @@ umap.plot.points(mapper, labels=df_raw.cible, color_key={1: 'blue', 0: 'yellow'}
 p = umap.plot.points(mapper, values=df_raw.age, cmap='RdYlGn_r', background='white')
 umap.plot.show(p)
 p = umap.plot.points(mapper, values=df_raw.nombre_prescriptions_hist, cmap='RdYlGn_r', background='white')
-p = umap.plot.points(mapper, values=df_raw.nombre_prescriptions_majeurs_hist, cmap='RdYlGn_r', background='white')
+p = umap.plot.points(mapper, values=np.log(df_raw.nombre_prescriptions_majeurs_hist), cmap='RdYlGn_r', background='white')
 umap.plot.show(p)
 p = umap.plot.points(mapper, values=df_raw.longueur_hors_tout, cmap='RdYlGn_r', background='white')
 umap.plot.show(p)
-p = umap.plot.points(mapper, values=np.log(df_raw.jauge_oslo), cmap='RdYlGn_r', background='white')
+p = umap.plot.points(mapper, values=np.log(df.jauge_oslo), cmap='RdYlGn_r', background='white')
+umap.plot.show(p)
+p = umap.plot.points(mapper, values=df.jauge_oslo_imputee, cmap='RdYlGn_r', background='white')
 umap.plot.show(p)
 p = umap.plot.points(mapper, values=df_raw.nombre_moteur, cmap='RdYlGn_r', background='white')
 umap.plot.show(p)
@@ -137,8 +141,10 @@ Dégradé du centre vers l'extérieur (des plus grands vers les plus petits).
 
 ### Nombre prescriptions majeures
 
-* Dégradé de la droite vers la gauche
+* Dégradé du bas vers le haut
 * Petite pointe de valeurs extrêmes au nord de l'îlot 3 
+* L'îlot 1 et 4 sont quasiment sans prescription majeures
+* L'îlot 2 est constitué de navires avec des faibles valeurs de prescriptions majeures 
 
 ### Jauge oslo
 
