@@ -1,0 +1,622 @@
+---
+title: "CibNav : Analyse exlporatoire des données"
+author: "Pierre Camilleri"
+date: "2023-04-18"
+format:
+  html:
+    embed-resources: true
+    code-fold: true
+    theme: readable
+    toc: true
+execute:
+  cache: true
+---
+
+## Préparation des données
+
+Les données explorées sont celles de l'échantillon d'entraînement.
+
+```{r import}
+#| cache: false
+#| include: false
+
+library(dotenv)
+library(dplyr)
+library(forcats)
+library(ggplot2)
+library(RPostgres)
+
+library(DataExplorer)
+
+library(plotly)
+library(rstanarm)
+library(bayesplot)
+```
+
+```{r dotenv}
+#| include: false
+
+dotenv::load_dot_env()
+```
+
+```{r db_connection}
+#| include: false
+
+con <- dbConnect(
+  RPostgres::Postgres(),
+  dbname = Sys.getenv('EMBULK_POSTGRESQL_DB'),
+  host = Sys.getenv('EMBULK_POSTGRESQL_HOST'),
+  port = Sys.getenv('EMBULK_POSTGRESQL_PORT'),
+  user = Sys.getenv('EMBULK_POSTGRESQL_USER'),
+  password = Sys.getenv('EMBULK_POSTGRESQL_PASSWORD')
+)
+```
+
+```{r load_data}
+df <- tbl(con, "dataset_train") %>%
+  collect()
+```
+
+```{r data_transformation}
+#| warning: false
+
+df$cible <- as.logical(df$cible)
+df$annee_visite <- as.integer(df$annee_visite)
+df$id_gin_visite <- as.integer(df$id_gin_visite)
+df$sitrep_history <- as.integer(df$sitrep_history)
+
+df$idc_gin_categ_navigation <- fct_recode(
+  as.factor(df$idc_gin_categ_navigation),
+  "5ème (eaux abritées)"="1",
+  "4ème (5 milles des eaux abritées)"="2",
+  "4ème (5 milles des eaux abritées)"="3",
+  "4ème (5 milles des eaux abritées)"="4",
+  "3ème (20 milles de la terre)"="5",
+  "3ème (20 milles de la terre)"="7",
+  "2ème (200 milles d'un port)"="8",
+  "2ème (200 milles d'un port)"="9",
+  "1ère"="10",
+  "6ème plaisance (2 milles d'un abri)"="11",
+  "5ème plaisance (5 milles d'un abri)"="12",
+  "4ème plaisance (20 milles d'un abri)"="13",
+  "3ème plaisance (60 milles d'un abri)"="14",
+)
+
+df$log_jauge_oslo <- log10(df$jauge_oslo)
+df$log_puissance_administrative <- log10(df$puissance_administrative)
+df$log_longueur_hors_tout <- log10(df$longueur_hors_tout)
+df$log_nombre_prescriptions <- log10(df$nombre_prescriptions)
+```
+
+Les catégories de navigation restreintes sont regroupées avec les non-restreintes.
+
+## Data preliminary exploration
+
+```{r auto_EDA}
+df_no_log <- df %>% select(!starts_with("log"))
+plot_intro(df_no_log)
+plot_missing(df_no_log)
+```
+
+Valeurs manquantes essentiellement pour : 
+
+- le genre de navigation
+- la jauge oslo
+
+Quelques valeurs manquantes pour :
+
+- les informations moteur (nbre, type, carburant)
+- la puissance admininistrative
+
+```{r auto_EDA_2}
+#| fig-cap: "Histogrammes des variables catégorielles"
+
+exclude <- c(
+  "date_visite",
+  "cible"
+  )
+plot_bar(df %>% select(!any_of(exclude)))
+```
+
+Observations :
+
+### `genre_navigation`
+
+- Valeurs multiples agrégées : exemple
+  "Conchyl.Petite Pêche"
+- Pourrait être regroupé en catégories plus générales, par
+  ex : "Cabotage International" + "Cabotage national" < "Cabotage"
+
+### `materiau_coque`
+
+- Divers niveau de précision, par exemple "BOIS" vs "BOIS MASSIF", "BOIS
+  MOULE" ou "CONTREPLAQUE"
+- Valeurs manquantes avec modalité "INCONNU"
+- Queue de modalités avec peu d'observations. À regrouper avec "AUTRES"
+
+### `type_carburant`
+
+- Présence de `NA` ET "INCONNU"
+- Queue de modalités avec peu d'observations. À regrouper avec "AUTRES"
+
+### `type_moteur`
+
+- Queue de modalités avec peu d'observations. À regrouper dans une catégorie "AUTRES"
+
+```{r simplify_cats}
+df <- df %>%
+  mutate(
+    genre_navigation = fct_lump_min(
+      genre_navigation,
+      min = 500,
+      other_level = "Autre"
+    ),
+
+    materiau_coque = fct_recode(
+      materiau_coque,
+      METAL = "AG/4 - ALU",
+      METAL = "ACIER",
+      METAL = "ACIER / INOX",
+      METAL = "ALLIAGE LEGER",
+      BOIS = "BOIS MASSIF",
+      BOIS = "BOIS MOULE",
+      BOIS = "CONTREPLAQUE",
+      PLASTIQUE = "POLYESTER EPOXY",
+      PLASTIQUE = "POLYETHYLENE",
+      PLASTIQUE = "PLASTIQUE SANDWICH",
+      NULL = "INCONNU"
+    ),
+
+    type_carburant = fct_lump_min(
+      type_carburant,
+      min = 500,
+      other_level = "Autre"
+    ),
+
+    type_moteur = fct_lump_min(
+      type_moteur,
+      min = 500,
+      other_level = "Autre"
+      ),
+  )
+```
+
+Les catégories avec peu de modalités ont été regroupées dans une catégorie
+"Autre".
+
+
+```{r auto_EDA_2_bis}
+#| fig-cap: "Histogrammes des variables catégorielles après regroupements de modalités"
+
+plot_bar(df %>% select(!any_of(exclude)))
+```
+
+```{r auto_EDA_3}
+#| fig-cap: "Vérification correspondance genre <> situation flotteur"
+
+plot_bar(df %>% select(genre_navigation, situation_flotteur), by = "situation_flotteur")
+```
+
+À quelques rares exceptions près, la correspondance `genre_navigation` <>
+`situation_flotteur` est assez cohérente.
+
+```{r auto_EDA_4}
+#| fig-cap: "Histogrammes des variables continues"
+include = c(
+  "age",
+  "annee_visite",
+plot_histogram(
+  df,
+  geom_histogram_args = list(bins = 100L)
+)
+```
+
+Observations :
+
+- `age` : Distribitution bi-modale avec un mode ~ 15 ans et un pic ~30 ans.
+  Des pics ponctuels s'ajoutent à cette distribution : peut-être des arrondis ?
+
+- `annee_visite` : uniforme sur 2016 2022 puis très peu d'obs en 2023.
+
+- `delai_visites` : un pic à 365 (un an) donc a priori en jours. DEs pics
+  secondaires, a priori autour de 2 ans, 2 ans et demi et 3 ans. Des valeurs
+  étranges (1, 2, 3...). Mélange de données théoriques ou arrondies, et de
+  données peut-être réelles ?
+
+- `id_gin_visite` distribué uniformément (comme on pourrait s'y attendre pour
+  un id).
+
+- `id_nav_flotteur` est-ce que c'est censé être un entier ? forte
+  concentration à un endroit, distribution plus diffuse sur deux autres
+  intervalles.
+
+- `jauge_oslo` - Valeurs extrêmes
+  - TODO appliquer log
+
+```{r auto_EDA_4}
+plot_histogram(
+  df %>% select(-jauge_oslo, -puissance_administrative),
+  geom_histogram_args = list(bins = 100L)
+)
+```
+
+```{r auto_EDA_5}
+plot_correlation(na.omit(df), maxcat = 5L)
+```
+
+Observations :
+
+- La cible est trés corrélé (sans surprise) avec le nombre de prescriptions.
+- Type moteur et type carburant assez redondant :
+  - moteur éléctrique <> électricité
+  - explosion <> essence (Plutôt les plus petits navires, moins de prescriptions)
+  - combustion <> gazole
+
+- Situation_flotteur pêche (par rapport au commerce) :
+  - plutôt les gros navires
+
+- Corrélation entre nombre prescriptions et annee visite ?
+  - Forte corrélation entre presc majeurs et mineures
+
+
+- puissance administrative, longueur, jauge_oslo, et nb_moteurs très correlées
+
+```{r correl_prescriptions_min_maj}
+ggplot(
+  df %>% sample_n(10000),
+  aes(x = nombre_prescriptions, y = nombre_prescriptions_majeurs),
+) +
+   geom_point(
+     position = position_jitter(width = 0.3, height = 0.3),
+     alpha = 0.1
+   ) +
+   geom_smooth(method = "gam") +
+   xlim(0, 15) +
+   ylim(0, 3)
+```
+
+En moyenne (et à la louche), on trouve une prescription majeure pour 10
+presciptions mineures, relation (quasi)-linéaire.
+
+```{r plot_age}
+ggplot(df, aes(x =age)) +
+  geom_bar()
+ggplot(df %>% filter(genre_navigation %in% c(
+  "Petite pêche",
+  "Conchyl.Pure",
+  "Pêche côtière",
+   "Pêche au large",
+   "Plaisance NC",
+   "Navigation côtière")),
+       aes(x =genre_navigation, y=age)) +
+  geom_violin()
+```
+
+La bi-modalité de l'âge est visible pour les navires de pêche (petite pêche, conchyl,
+pêche côtière).
+
+```{r plot_age_2}
+df_pp <- df %>%
+  filter(
+    genre_navigation %in% c("Petite pêche"),
+    type_moteur %in% c("Explosion", "Combustion Interne")
+  )
+
+p1 <- ggplot(df_pp,
+       aes(x = age, y = puissance_administrative, color = type_moteur)) +
+                 geom_jitter(height = 10, width = 0.5, alpha = 0.3)
+
+p2 <- ggplot(df_pp,
+       aes(x = age, color = type_moteur)) +
+                 geom_density()
+
+bayesplot_grid(p1, p2)
+
+```
+
+La bi-modalité s'explique principalement par le type de moteur !
+Surprenant de voir peu de moteurs à combustion interne récents : changement
+législatif ?
+
+```{r plot_longueur_puissance}
+
+ggplot(
+   df %>% filter(is.finite(puissance_administrative)),
+   aes(x = longueur_hors_tout, y = puissance_administrative, color =situation_flotteur)
+   ) +
+                geom_point() +
+                geom_smooth(method="lm")
+
+ggplot(
+   df %>% filter(is.finite(log_puissance_administrative)),
+   aes(x = log_longueur_hors_tout, y = log_puissance_administrative, color =situation_flotteur)
+   ) +
+                geom_point() +
+                geom_smooth(aes(color = situation_flotteur), method="gam")
+```
+
+Ici on remarque plein de choses intéressantes :
+
+- Pour les navires commerciaux, il y a deux dynamiques puissance <> longueur
+  très différentes entre, bien visible pour les grandes longueurs.
+- Il y a un effet de seuil important à la limite règlementaire
+- Il y a également un certain nombre de valeurs extrêmes de puissance pour des
+  valeurs de longueur ~5m (log_long ~0.8)
+- Enfin, il y a un cluster de valeurs atypiques pour de faibles valeurs de
+  longueur.
+
+
+- Pour les navires de pêches, il semble y avoir plus d'homogénéité, avec une
+  relation quasi linéaire  (rappel : en log-log)
+
+
+  Hypothèses :
+
+  - Régimes différents avant et après le seuil
+  - Peut-être que le genre de navigation donne des informations ?
+
+```{r plot_longueur_puissance_genre}
+
+p <- ggplot(
+   df %>% filter(is.finite(log_puissance_administrative)) %>% sample_n(10000),
+   aes(x = log_longueur_hors_tout, y = log_puissance_administrative, color =genre_navigation),
+   ) +
+                geom_point(position = position_jitter(width= 0.02, height = 0.02), alpha = 0.3) +
+                # geom_density_2d() +
+                geom_smooth(aes(group = situation_flotteur), method="gam",
+                            color = "red") +
+       facet_grid(rows = vars(situation_flotteur))
+
+p
+ggplotly(p)
+```
+
+Concernant les deux dynamiques :
+
+  − avec cette visu, on voit même 3 dynamiques
+  - la dynamique du bas représente plutôt des navires de plaisance
+  - La navigation côtière s'insère entre les deux
+  - Les navires de remorquage et de pilotage ont les puissances supérieures.
+  - Les navires de cabotage international sont partagés entre les deux
+
+Concernant le cluster de petits navires :
+  - Genre essentiellement inconnu, sauf 1 > Navigation côtière
+    Hypothèse : petits hors board de navig côtière
+
+Concernant les navires de pêche :
+  - Conchyl semble moins puissants en moyenne que petite pêche
+  - Infra seuil : petite pêche ; supra seuil : pêche côtière
+
+Autres observations :
+
+- Étonnement, il semble y avoir deux dynamiques pour les navires de
+    plaisance également de longueur hors tout infra seuil
+
+    Hypothèse : deux types de motorisations différentes
+
+```{r plot_longueur_puissance_motorisation}
+
+p <- ggplot(
+   df %>%
+ filter(is.finite(log_puissance_administrative)) %>%
+ filter(type_moteur %in% c("Explosion", "Combustion Interne", "Diesel électrique")),
+   aes(x = log_longueur_hors_tout, y = log_puissance_administrative, color =genre_navigation),
+   ) +
+                geom_point(position = position_jitter(width= 0.02, height = 0.02), alpha = 0.3) +
+                # geom_density_2d() +
+                geom_smooth(aes(group = situation_flotteur), method="gam",
+                            color = "red") +
+       facet_grid(rows = vars(situation_flotteur), cols= vars(type_moteur))
+
+p
+ggplotly(p)
+
+```
+
+- On observe :
+  - Les puissances valeurs extrêmes sont des moteurs à explosion
+  - La plupart (mais pas tous) les navires de plaisance faible puissance sont
+    à Combustion Interne, et forte puissance à explosion
+  - La conchiliculture utilise beaucoup des navires à explosion
+  - Les moteurs à explosion sont étagées contrairement aux moteurs à
+    combustion interne
+
+
+TODO :
+- Les clusters de points indiques plusieurs observations pour les même
+  navires. Est-ce que l'apprentissage fait gaffe de ne pas mettre les mêmes
+  navires en train et test ?
+
+- Visuellement, les pentes de puissance(longueur) (en log-log) semblent
+  dépendre de la motorisation
+
+```{r plot_longueur_puissance_jauge}
+p <- ggplot(
+   df %>%
+ filter(is.finite(log_puissance_administrative)) %>%
+ filter(type_moteur %in% c("Explosion", "Combustion Interne")) %>%
+ sample_n(10000),
+   aes(x = log_longueur_hors_tout, y = log_puissance_administrative, color = log_jauge_oslo),
+   ) +
+                geom_point(position = position_jitter(width= 0.02, height = 0.02), alpha = 0.5) +
+                # geom_density_2d() +
+                geom_smooth(aes(group = situation_flotteur), method="gam",
+                            color = "red") +
+       facet_grid(rows = vars(situation_flotteur), cols= vars(type_moteur)) +
+       scale_color_distiller(palette = "Spectral")
+
+p
+ggplotly(p)
+
+
+```
+
+Quelques anomalies de gros navires commerce + combustion interne qui ont une
+jauge Oslo très faible.
+
+- Jauge Oslo moteurs à explosion < jauge oslo moteur à combustion interne à
+  longueur égale
+- Phénomène intéressant sur commerce + combustion interne, où les navires les
+  moins puissants semblent avoir une plus grande jauge oslo (probablement
+  loisir).
+
+```{r plot_longueur_puissance_coque}
+p <- ggplot(
+   df %>%
+ filter(is.finite(log_puissance_administrative)) %>%
+ sample_n(10000),
+   aes(x = log_longueur_hors_tout, y = log_puissance_administrative, color =
+       as.factor(materiau_coque))
+   ) +
+                geom_point(position = position_jitter(width= 0.02, height =
+                                                      0.02), alpha = 0.5)
+
+p
+ggplotly(p)
+```
+
+
+```{r plot_longueur_puissance_coque_2}
+p <- ggplot(
+   df %>%
+ filter(is.finite(log_puissance_administrative)) %>%
+ filter(genre_navigation %in% c(
+   "Petite pêche",
+   "Conchyl.Pure",
+   "Pêche côtière",
+   "Pêche au large",
+   "Plaisance NC",
+   "Navigation côtière"
+ )) %>%
+ sample_n(10000),
+   aes(x = log_longueur_hors_tout, y = log_puissance_administrative, color =
+       as.factor(materiau_coque))
+   ) +
+                geom_point(position = position_jitter(width= 0.02, height = 0.02), alpha = 0.5) +
+       facet_wrap(vars(genre_navigation))
+
+p
+ggplotly(p)
+```
+
+- Concernant les deux dynamiques de bateaux de plaisance, les faibles puissances
+ont la majorité des coques en bois, alors que les plus puissants ont des
+coques plastique ou alu
+
+- Un certain nombre de coques bois également pour la ptite pêche (même si
+  plastique majoritaire).
+
+- Pour la conchyliculture, coques métal essentiellement
+
+- Les coques métal semblent préféré par les gros navires
+
+# Exploration du nombre de prescriptions majeures
+
+```{r explo_prescr_by_age}
+ggplot(
+       df,
+       aes(
+         x = cut(age, 10),
+         y = nombre_prescriptions_majeurs
+       )) +
+  stat_summary(fun = "mean", geom = "col")
+
+```
+
+Variations non monotones des prescriptions majeures avec l'âge
+
+```{r explo_prescr_by_length}
+# By length
+ggplot(
+       df,
+       aes(
+         x = cut(log_longueur_hors_tout, 10),
+         y = nombre_prescriptions_majeurs
+       )) +
+  stat_summary(fun = "mean", geom = "col")
+```
+
+Variations quasi linéaire des prescr maj avec le log de la
+log_longueur_hors_tout
+
+```{r explo_prescr_by_genre}
+ggplot(
+       df %>% filter(genre_navigation %in% c(
+  "Petite pêche",
+  "Conchyl.Pure",
+  "Pêche côtière",
+   "Pêche au large",
+   "Plaisance NC",
+   "Navigation côtière",
+   "Pilotage",
+   "Lamanage")),
+       aes(
+         x = genre_navigation,
+         y = nombre_prescriptions_majeurs
+       )) +
+  stat_summary(fun = "mean", geom = "col")
+```
+
+Les activités de pêche semblent avoir plus de prescr. majeures. Les activités
+de plaisance en ont le moins.
+
+```{r explo_prescr_by_moteur}
+ggplot(
+       df,
+       aes(
+         x = type_moteur,
+         y = nombre_prescriptions_majeurs
+       )) +
+  stat_summary(fun = "mean", geom = "col")
+```
+
+Nettement plus de prescr majeures pour les moteurs à comb interne que pour les
+moteurs électriques (ils sont aussi plus vieux)
+
+
+# Tentative de classification manuelle
+
+Deux dynamiques de plaisance.
+
+```{r class_init}
+df_class <- df
+df_class$cat <- NA
+```
+
+```{r class_plaisance}
+mod <- lm(
+  log_puissance_administrative ~ log_longueur_hors_tout,
+  data = df %>% filter(genre_navigation == "Plaisance NC")
+)
+
+df_class <- df_class %>%
+  mutate(
+    cat = ifelse(
+      genre_navigation == "Plaisance NC" & log_puissance_administrative < predict(mod, df_class),
+      "Plaisance",
+      cat
+    ),
+    cat = ifelse(
+      genre_navigation == "Plaisance NC" & log_puissance_administrative >= predict(mod, df_class),
+      "Plaisance sport",
+      cat
+    )
+    )
+```
+
+```{r plot_cat_age_prescr}
+p <- ggplot(
+  df_class %>%
+    sample_n(10000),
+  aes(y  = log(nombre_prescriptions+1), x = cat, color = cat)) +
+          geom_violin(adjust = 2, draw_quantiles = c(0.25, 0.5, 0.75)) +
+          geom_jitter(height = 0.1, width = 0.5, alpha = 0.3)
+  xlim(-1, 20)
+
+  p
+
+```
+
+--> Difficulté d'analyser des graphiques avec des nombres de prescriptions,
+car beaucoup de variabilité sur des navires de même type.
+

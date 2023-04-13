@@ -1,0 +1,101 @@
+/*-- scss:defaults --*/
+
+$font-family-sans-serif: Carlito, Lato, Arial;
+
+$font-family-monospace: "Courier New";
+$headings-font-family: Poppins, Verdana;
+$headings-font-weight: 600;
+$h1-font-size: 38px;
+$h2-font-size: 28px;
+
+
+$primary: #4FC4AF;
+$secondary: #FFC07A;
+
+$body-color: #063442;
+$body-secondary-color: #999999;
+
+$link-color: #ED7901;
+$nav-link-color: $body-color;
+$link-hover-color: #FFC07A;
+
+/*-- scss:rules --*/
+$text-color: #063442;
+$main-color: #4FC4AF;
+$dark-color: #2F746E;
+$light-color: #C1E7D2;
+$highlight-color: #FDF3CF;
+
+$secondary-color: #FFC07A;
+$secondary-color-dark: #ED7901;
+
+$r-background-color: white;
+$r-main-color: $main-color;
+
+$r-main-font-size: 32px;
+$r-block-margin: 3%;
+
+$r-heading-color: $text-color;
+$r-heading-line-height: 1.2em;
+$r-heading-text-transform: none;
+
+$r-code-font: "Courier New";
+$link-visited-color: #B84C03;
+$r-link-color-hover: $secondary-color;
+$r-selection-color: white;
+$r-selection-background-color: $main-color;
+
+figure {
+  text-align: center;
+  border-left: 0.5em solid $dark-color;
+  padding: 0.5em;
+}
+
+figcaption.figure-caption {
+  font-weight: 600;
+  color: $text-color;
+}
+
+h1 {
+  text-align: left;
+  padding-left: 0.5em;
+  border-left: 0.25em solid $main-color;
+}
+
+h2 {
+  background: $main-color;
+  color: white;
+  display: table;
+  padding: 5px 15px;
+}
+
+.img-shadow {
+  box-shadow:12px 12px $highlight-color;
+}
+
+strong {
+  background: linear-gradient(to left, $highlight-color, $highlight-color);
+  background-position: 0.2em bottom;
+  background-size: 100% 60%;
+  background-repeat: no-repeat;
+  padding-right: 0.2em;
+  margin-right: -0.2em;
+}
+
+code {
+  background-color: $highlight-color;
+  color: $text-color;
+  font-size: calc(0.8 * $r-main-font-size);
+}
+
+a:visited {
+  color: $link-visited-color;
+}
+
+.anchorjs-link, .anchorjs-link:visited {
+  color: $body-color;
+}
+
+h2 .anchorjs-link, h2 .anchorjs-link:visited {
+  color: $white;
+}
