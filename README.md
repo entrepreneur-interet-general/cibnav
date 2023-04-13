@@ -1,5 +1,13 @@
 <img src="https://eig.etalab.gouv.fr/img/eig3-cibnav.svg" width="250"/>
 
+## Documentation
+
+La documentation de l'outil, des variables et du modèle est disponible
+[ici](https://entrepreneur-interet-general.github.io/cibnav/).
+
+La source en markdown est dans le dossier "docs", et la documentation est 
+mise-à-jour en cas de changement à chaque push. 
+
 ## Data Engineering For CibNav
 
 Utiliser Python3
