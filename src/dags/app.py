@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-# App : Core functions of cibnav project 
+# App : Core functions of cibnav project
 
 
 pré-réquis : - chaque navire a ses informations a jour dans la table navire (dag : navire_oracle_postgre, navire_version_oracle_postgre, navire_version_gina_oracle_postgre   )
              - les visites sont a jour dans la table visite (dag : visite_oracle_postgre  )
 
-Ce dag a pour objet la création d'un dataset 
+Ce dag a pour objet la création d'un dataset
 
 Ce DAG peut être executé seulement à l'intérieur du Ministère de la Transition Ecologique Et Solidaire.
 """
@@ -73,7 +73,7 @@ def load_navire(engine, prediction_phase=False):
 
 def exporter_df(df: pd.DataFrame,  engine, indexes: list= []):
     df.date_visite = df.date_visite.astype(str)
-    df = df.set_index(indexes)     
+    df = df.set_index(indexes)
     df.to_sql('dataset_train', engine, if_exists='replace')
 
 def trie_dataset(df):
@@ -84,7 +84,7 @@ def trie_dataset(df):
     return df.reset_index()
 
 def sitrep_anterieur_visite(visite, sitreps: pd.DataFrame):
-    """ Pour chaque 
+    """ Pour chaque
     """
     navire = visite['id_nav_flotteur']
     annee_precedente = visite['date_visite'].year
@@ -93,12 +93,12 @@ def sitrep_anterieur_visite(visite, sitreps: pd.DataFrame):
 def ajout_delai_entre_visites(df):
     df_time = df.copy()
     engine = connection_db()  ## Connection aux tables postgres
-    
+
     df_time.to_sql('debug_visits', engine, if_exists='replace')
 
     df_time['delai_visites'] = df_time['date_visite'].diff()
-    df_time['checkindex'] = df_time['id_nav_flotteur'].diff() 
-                    
+    df_time['checkindex'] = df_time['id_nav_flotteur'].diff()
+
     # The diff function will apply to all the visits. We will only consider the lines where the vessel is the same (id_nav_flotteur - id_nav_flotteur == 0)
     df_time['delai_visites'] = df_time.apply(lambda row: row['delai_visites'].days if row['checkindex'] == 0 else np.nan, axis=1)
     df_time['delai_visites'] = df_time['delai_visites'].fillna(365)
@@ -110,27 +110,27 @@ def ponderation(data, variable, unite='id_nav_flotteur', type_poids='poids_const
     """
     Cette fonction permet de selectionner un vecteur et de ponderer son historique en fonction
     de poids.
-    
+
     Pre-requis : Dataset trie par navire et par date de visite
     """
     df = data.copy(deep=True) #On copie pour ne pas modifier directement notre Dataframe
-    
+
     lag = max(data['id_nav_flotteur'].value_counts())
     if type_poids is 'poids_constants':
         poids = list(np.ones(lag))[::-1]
     else: ## Poids arithmetiques
         poids = np.arange(lag)[::-1]
-    
+
     df["tmp_hist"] = 0
 
     for i in range(0,len(poids)): #On boucle sur l'historique et on affecte un poids a chaque visite antérieure
         df["poids"] = poids[i]*df.groupby([unite])[variable].shift(i+1)
         df['tmp_hist'] = df.fillna(0)['tmp_hist'] + df.fillna(0)["poids"]
-        
+
     del df['poids']
     df['{}_hist'.format(variable)]=df['tmp_hist']
     del df['tmp_hist']
-    
+
     return df
 
 # Création de la cible au moins une préscription majeure ou au moins 4 mineurs
@@ -168,31 +168,31 @@ def creation_dataset(engine, prediction_phase=False):
     sitreps = load_sitrep(engine)
 
     df = pd.merge(left=visites, right=navires, left_on='id_nav_flotteur', right_on='id_nav_flotteur')
-    
+
     # A ce stade, une ligne correspond a une visite de sécurité
     if prediction_phase:
-        df = creation_visite_simulee(df) 
-   
+        df = creation_visite_simulee(df)
+
     df = trie_dataset(df)
     # Ajout pour chaque visite des sitrep anterieures
-    df['sitrep_history'] = df.apply(lambda row: sitrep_anterieur_visite(row, sitreps), axis=1).fillna(0) 
+    df['sitrep_history'] = df.apply(lambda row: sitrep_anterieur_visite(row, sitreps), axis=1).fillna(0)
     return df
 
 
 # Creation des dataset, entrainement ou prevision
-# Sortie : Ecriture directe dans la table dataset_train / ou renvoi dataset_predict 
+# Sortie : Ecriture directe dans la table dataset_train / ou renvoi dataset_predict
 def process_dataset(prediction_phase=False):
     engine = connection_db()  ## Connection aux tables postgres
     df = creation_dataset(engine, prediction_phase=prediction_phase)
-    
+
     df = ajout_delai_entre_visites(df)
 
     # Calcul des historiques de prescriptions
-    df = ponderation(df, 'nombre_prescriptions', type_poids='poids_airthmetiques') 
-    df = ponderation(df, 'nombre_prescriptions_majeurs', type_poids='poids_constants') 
+    df = ponderation(df, 'nombre_prescriptions', type_poids='poids_airthmetiques')
+    df = ponderation(df, 'nombre_prescriptions_majeurs', type_poids='poids_constants')
     df['nombre_prescriptions_hist'] = df['nombre_prescriptions_hist'].fillna(0)
     df['nombre_prescriptions_majeurs_hist'] = df['nombre_prescriptions_majeurs_hist'].fillna(0)
-    
+
     df['age'] = df['annee_visite'] - df['annee_construction'] #probleme : age erroné
     del df['annee_construction']
 
@@ -213,7 +213,7 @@ def chargement_dataset(engine, database="dataset_train", index="id_gin_visite", 
         df = pd.read_sql("{}, cible  from {}".format(beginning_query, database), engine)
     else:
         df = pd.read_sql("{} from {}".format(beginning_query, database), engine)
-    
+
     df['situation_flotteur'] = df['situation_flotteur'].astype(str)
     df['genre_navigation'] = df['genre_navigation'].astype(str)
     df['type_moteur'] = df['type_moteur'].astype(str)
@@ -225,45 +225,45 @@ def split_target(df, prediction_phase=False):
     y = df['cible'].copy()
     del df['cible']
     if prediction_phase:
-        return df 
+        return df
     else:
-        return df, y 
+        return df, y
 
 def predict_cible(model, X):
     y_pred = model.predict(X)
     y_pred_prob_tmp = model.predict_proba(X)
     y_prob_pred = [item[1] for item in y_pred_prob_tmp]
     return y_pred, y_prob_pred
-    
+
 def create_pipeline():
     categorical_preprocessing = Pipeline([
         ('imputer_str', SimpleImputer(strategy="constant", fill_value='None')),
-        ('ohe', OneHotEncoder(handle_unknown='ignore'))]) 
+        ('ohe', OneHotEncoder(handle_unknown='ignore'))])
 
     numeric_preprocessing = Pipeline(steps=[
-        ("imputer_num", SimpleImputer(strategy="mean")), 
+        ("imputer_num", SimpleImputer(strategy="mean")),
         ("scaler", MaxAbsScaler())])
 
     integer_preprocessing = Pipeline(steps=[
-            ("imputer_num", SimpleImputer(strategy="most_frequent")), 
+            ("imputer_num", SimpleImputer(strategy="most_frequent")),
             ("scaler", MaxAbsScaler())])
 
     preprocess = ColumnTransformer([
             ('categorical_preprocessing', categorical_preprocessing, CAT_PARAM),
-            ('numerical_preprocessing', numeric_preprocessing, NUM_PARAM), 
+            ('numerical_preprocessing', numeric_preprocessing, NUM_PARAM),
             ('numerical_preprocessing_mot', integer_preprocessing, ['nombre_moteur'])
             ])
-    return preprocess 
+    return preprocess
 
 def train():
     engine = connection_db()
-    
+
     df = chargement_dataset(engine, prediction_phase=False)
-    
+
     previsions = pd.DataFrame(index=df.id_gin_visite)
     del df['id_gin_visite']
     del df['id_nav_flotteur']
-    
+
     preprocess = create_pipeline()
     model_pipe = Pipeline([
             ('preprocess', preprocess),
@@ -272,12 +272,12 @@ def train():
 
 
     x, y = split_target(df, prediction_phase=False)
-    
+
     model = model_pipe.fit(x, y)
-    
+
     # Saving model
     pickle.dump(model, open("/opt/etl/airflow/modeles/cibnav_ml_v3.pkle", 'wb'))
-    
+
 
 ## Début Troisième Task - Génération d un jeu de donnees qui simule pour chaque navire une visite de securite aujourd hui
 ## Creation du dataset de ciblage pour la production
@@ -290,23 +290,23 @@ def export_dataset_predict():
     del df['nombre_prescriptions']
     del df['nombre_prescriptions_majeurs']
     df.to_sql('dataset_predict', engine, if_exists='replace', index=False)
-    
-    
+
+
 ## Début Quatrieme Task - Prévision sur la flotte actuelle et priorisation
-    
+
 def prediction_flotte():
     engine = connection_db()
     df = chargement_dataset(engine, database='dataset_predict', index='id_nav_flotteur', prediction_phase=True)
-    
+
     previsions = pd.DataFrame(index=df.id_nav_flotteur)
-    
+
     del df['id_gin_visite']
     del df['id_nav_flotteur']
 
-    model_pipe = pickle.load(open("/opt/etl/airflow/modeles/cibnav_ml_v3.pkle", 'rb')) 
+    model_pipe = pickle.load(open("/opt/etl/airflow/modeles/cibnav_ml_v3.pkle", 'rb'))
     y_pred, y_prob_pred = predict_cible(model_pipe, df)
-    previsions['prevision'] = y_pred 
-    previsions['probabilite'] = y_prob_pred 
+    previsions['prevision'] = y_pred
+    previsions['probabilite'] = y_prob_pred
 
     previsions = previsions.sort_values(by='probabilite', ascending=False)
     previsions['ranking'] = np.arange(start=1, stop=len(previsions) + 1)
