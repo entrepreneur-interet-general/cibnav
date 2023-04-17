@@ -66,7 +66,7 @@ def load_sitrep(engine):
     return pd.read_sql("select * from sitrep", engine)
 
 def load_navire(engine, prediction_phase=False):
-    beginning_query = "select id_nav_flotteur, annee_construction, longueur_hors_tout, genre_navigation, jauge_oslo, nombre_moteur, num_version, puissance_administrative, materiau_coque, situation_flotteur, type_carburant, type_moteur from navire where longueur_hors_tout < 24"
+    beginning_query = "select id_nav_flotteur, annee_construction, longueur_hors_tout, genre_navigation, jauge_oslo, nombre_moteur, num_version, puissance_administrative, materiau_coque, situation_flotteur, type_carburant, type_moteur, idc_gin_categ_navigation from navire where longueur_hors_tout < 24"
     if prediction_phase:  ## Nous ne gardons que les navires dont le PN est actif pour le ranking
         return pd.read_sql("{} and (idc_certificat in (47,67,68,69,1007)) and (idc_etat_certificat<=3 or idc_etat_certificat=6)".format(beginning_query), engine)
     else:
