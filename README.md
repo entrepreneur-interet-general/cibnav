@@ -49,8 +49,8 @@ make dump-metabase-config
 Menu contextuel > "Téléchargement SCP"
 
 Et récupérer :
-* `/root/cibnav-dev/dump/metabase.sql`
-* `/root/cibnav-dev/dump/cibnav.sql`
+* `/root/cibnav-dev/dump/metabase.tar`
+* `/root/cibnav-dev/dump/cibnav.tar`
 
 
 #### Lancer le docker-compose
