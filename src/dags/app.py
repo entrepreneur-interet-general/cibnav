@@ -34,7 +34,8 @@ from helpers import default_args, embulk_run, read_sql_query, resolve_env, conne
 
 PRESCRIPTIONS_THRESHOLD = 4
 
-CAT_PARAM = ['genre_navigation', 'materiau_coque', 'situation_flotteur', 'type_carburant', 'type_moteur']
+CAT_PARAM = ['genre_navigation', 'materiau_coque', 'situation_flotteur',
+             'type_carburant', 'type_moteur', 'idc_gin_categ_navigation']
 NUM_PARAM = ['annee_visite', 'jauge_oslo', 'longueur_hors_tout', 'num_version', 'puissance_administrative', 'nombre_prescriptions_hist', 'nombre_prescriptions_majeurs_hist', 'sitrep_history', 'age', 'delai_visites']
 
 default_args = default_args({
