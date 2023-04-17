@@ -78,18 +78,20 @@ def exporter_df(df: pd.DataFrame,  engine, indexes: list= []):
     df.to_sql('dataset_train', engine, if_exists='replace')
 
 def trie_dataset(df):
-    """ Retourne un dataset groupé par navire, trié par date de visite
+    """ 
+    Retourne un dataset groupé par navire, trié par date de visite
     """
     df = df.set_index(['id_nav_flotteur', 'date_visite'])
     df = df.sort_index()
     return df.reset_index()
 
 def sitrep_anterieur_visite(visite, sitreps: pd.DataFrame):
-    """ Pour chaque
+    """ 
+    Retourne le nombre de sitreps (Situation Report) connus dans tout l'historique jusqu'à l'année précédent à la visite
     """
     navire = visite['id_nav_flotteur']
-    annee_precedente = visite['date_visite'].year
-    return sitreps[(sitreps['id_nav_flotteur'] == navire) & (sitreps['annee'] <= annee_precedente)]['sitrep'].sum()
+    annee_visite = visite['date_visite'].year
+    return sitreps[(sitreps['id_nav_flotteur'] == navire) & (sitreps['annee'] < annee_visite)]['sitrep'].sum()
 
 def ajout_delai_entre_visites(df):
     df_time = df.copy()
