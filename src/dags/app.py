@@ -57,20 +57,23 @@ dag.doc_md = __doc__
 
 def load_visits(engine):
     ## Résumés de visites avec le nombre de prescriptions
-    visites = pd.read_sql("select * from visite_securite where extract(year from date_visite) >= 2015", engine)
-    visites['annee_visite'] = visites['date_visite'].apply(lambda date_visite: date_visite.year)
-    visites['date_visite'] = visites['date_visite'].apply(lambda date_visite: date_visite.date())
-    return visites.fillna(0)
+    params = ['id_nav_flotteur', 'date_visite', 'nombre_prescriptions', 'nombre_prescriptions_majeurs', 'id_gin_visite']
+    query = pd.read_sql(f"select {', '.join(params)} from visite_securite where extract(year from date_visite) >= 2015", engine)
+    query['annee_visite'] = query['date_visite'].apply(lambda date_visite: date_visite.year)
+    query['date_visite'] = query['date_visite'].apply(lambda date_visite: date_visite.date())
+    return query.fillna(0)
 
 def load_sitrep(engine):
-    return pd.read_sql("select * from sitrep", engine)
+    params = ['id_nav_flotteur', 'annee', 'sitrep']
+    return pd.read_sql(f"select {', '.join(params)} from sitrep", engine)
 
 def load_navire(engine, prediction_phase=False):
-    beginning_query = "select id_nav_flotteur, annee_construction, longueur_hors_tout, genre_navigation, jauge_oslo, nombre_moteur, num_version, puissance_administrative, materiau_coque, situation_flotteur, type_carburant, type_moteur, idc_gin_categ_navigation from navire where longueur_hors_tout < 24"
+    params = ['id_nav_flotteur', 'genre_navigation', 'materiau_coque', 'situation_flotteur', 'type_carburant', 'type_moteur', 'idc_gin_categ_navigation', 'longueur_hors_tout', 'jauge_oslo', 'puissance_administrative', 'num_version']
+    query = f"select {', '.join(params)} from navire where longueur_hors_tout < 24"
     if prediction_phase:  ## Nous ne gardons que les navires dont le PN est actif pour le ranking
-        return pd.read_sql("{} and (idc_certificat in (47,67,68,69,1007)) and (idc_etat_certificat<=3 or idc_etat_certificat=6)".format(beginning_query), engine)
+        return pd.read_sql("{} and (idc_certificat in (47,67,68,69,1007)) and (idc_etat_certificat<=3 or idc_etat_certificat=6)".format(query), engine)
     else:
-        return pd.read_sql(beginning_query, engine)
+        return pd.read_sql(query, engine)
 
 def exporter_df(df: pd.DataFrame,  engine, indexes: list= []):
     df.date_visite = df.date_visite.astype(str)
