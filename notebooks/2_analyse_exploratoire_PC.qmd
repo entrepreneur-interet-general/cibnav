@@ -1,6 +1,8 @@
 ---
-title: "CibNav : Analyse exlporatoire des données"
-author: "Pierre Camilleri"
+title: "CibNav : Analyse exploratoire des données"
+author:
+  - "Quentin Loridant"
+  - "Pierre Camilleri"
 date: "2023-04-18"
 format:
   html:
@@ -469,7 +471,8 @@ ggplot(
     facet_grid(rows = vars(situation_flotteur))
 ```
 
-Avec cette visualisation, on voit même 3 dynamiques
+Avec cette visualisation, on voit même 3 dynamiques :
+
   - la dynamique du bas représente plutôt des navires de plaisance
   - La navigation côtière s'insère entre les deux
   - La dynamique du haut sont des navires étiquetés "Autre", il s'agit de
@@ -477,10 +480,12 @@ Avec cette visualisation, on voit même 3 dynamiques
   - Les navires de cabotage international sont partagés entre les deux
 
 Concernant le cluster de petits navires :
+
   - Genre essentiellement inconnu, sauf 2 > Navigation côtière & plaisance.
     Hypothèse : petits hors bord de navig côtière
 
 Concernant les navires de pêche :
+
   - Conchyl semble moins puissants en moyenne que petite pêche
   - Ce qui semble différencier la petite pêche de la pêche côtière semble être
     la taille du navire.
@@ -504,6 +509,7 @@ ggplot(
 ```
 
 On observe :
+
   - Plus le navire est puissant, plus il aura tendance à utiliser un moteur à
     combustion interne.
 
@@ -520,7 +526,7 @@ ggplot(
 
 Lien très net entre longueur hors tout et jauge oslo (en log-log).
 
-# Exploration du nombre de prescriptions majeures
+## Exploration du nombre de prescriptions majeures
 
 ```{r explo_prescr_by_age}
 #| fig-cap: "Nombre moyen de prescriptions majeures en founction de l'âge (et distribution des navires par âge)"
