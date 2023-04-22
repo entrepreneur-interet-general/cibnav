@@ -174,6 +174,25 @@ def ajout_delai_entre_visites(df):
     return df_time
 
 
+def recode_categ(categ):
+    mapping = {
+        "1": "5ème (eaux abritées)",
+        "2": "4ème (5 milles des eaux abritées)",
+        "3": "4ème (5 milles des eaux abritées)",
+        "4": "4ème (5 milles des eaux abritées)",
+        "5": "3ème (20 milles de la terre)",
+        "7": "3ème (20 milles de la terre)",
+        "8": "2ème (200 milles d'un port)",
+        "9": "2ème (200 milles d'un port)",
+        "10": "1ère",
+        "11": "6ème plaisance (2 milles d'un abri)",
+        "12": "5ème plaisance (5 milles d'un abri)",
+        "13": "4ème plaisance (20 milles d'un abri)",
+        "14": "3ème plaisance (60 milles d'un abri)",
+    }
+    return categ.replace(mapping)
+
+
 def ponderation(data, variable, unite="id_nav_flotteur", type_poids="poids_constants"):
     """
     Cette fonction permet de selectionner un vecteur et de ponderer son historique en fonction
@@ -298,6 +317,8 @@ def process_dataset(prediction_phase=False):
 
     df["age"] = df["annee_visite"] - df["annee_construction"]  # probleme : age erroné
     del df["annee_construction"]
+
+    df["idc_gin_categ_navigation"] = recode_categ(df["idc_gin_categ_navigation"])
 
     if not prediction_phase:  ## Pour l entrainement du modele
         df = creation_cibles(df)
