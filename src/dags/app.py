@@ -16,6 +16,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 from airflow import DAG
+from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import PythonOperator
 from helpers import connection_db, default_args
 from sklearn.compose import ColumnTransformer
@@ -486,8 +487,8 @@ task_prediction_visites = PythonOperator(
 )
 
 ## Ordre des taches Airflow
-start = DummyOperator(task_id="start", dag=dag)
-end = DummyOperator(task_id="end", dag=dag)
+start = EmptyOperator(task_id="start", dag=dag)
+end = EmptyOperator(task_id="end", dag=dag)
 
 task_process_data.set_upstream(start)
 task_dataset_flotte.set_upstream(start)
