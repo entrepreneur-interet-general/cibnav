@@ -16,8 +16,6 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 from airflow import DAG
-
-<<<<<<< HEAD
 from airflow.operators.python import PythonOperator
 from helpers import connection_db, default_args
 from sklearn.compose import ColumnTransformer
@@ -106,7 +104,6 @@ def load_visits(engine):
 
 def load_sitrep(engine):
     return pd.read_sql(f"select {', '.join(INPUT_SITREP_PARAMS)} from sitrep", engine)
-
 
 
 def load_navire(engine, prediction_phase=False):
@@ -218,16 +215,9 @@ def ponderation(data, variable, unite="id_nav_flotteur", type_poids="poids_const
     return df
 
 
-# Création de la cible au moins une préscription majeure ou au moins 4 mineurs
+# Création de la cible au moins une prescription majeure ou au moins 4 mineurs
 def creation_cibles(df: pd.DataFrame):
-    df["cible"] = (
-        df["nombre_prescriptions_majeurs"]
-        .apply(lambda x: "1" if x > 0 else "0")
-        .astype(int)
-    )
-    df["cible"] = df["cible"] | df["nombre_prescriptions"].apply(
-        lambda x: "1" if x >= PRESCRIPTIONS_THRESHOLD else "0"
-    ).astype(int)
+    df["cible"] = df["nombre_prescriptions_majeurs"]
     return df
 
 
