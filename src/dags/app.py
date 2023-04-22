@@ -184,34 +184,32 @@ def recode_categ(categ):
     return categ.replace(mapping)
 
 
-def ponderation(data, variable, unite="id_nav_flotteur", type_poids="poids_constants"):
+def lag_variable_by_year(data, variable):
     """
-    Cette fonction permet de selectionner un vecteur et de ponderer son historique en fonction
-    de poids.
-
-    Pre-requis : Dataset trie par navire et par date de visite
+    Cette fonction permet de créer une nouvelle variable (avec le suffixe
+    "_hist") qui contient la valeur de l'année précédente (sommée si plusieurs
+    observations.
     """
-    df = data.copy(
-        deep=True
-    )  # On copie pour ne pas modifier directement notre Dataframe
 
-    lag = max(data["id_nav_flotteur"].value_counts())
-    if type_poids == "poids_constants":
-        poids = list(np.ones(lag))[::-1]
-    else:  ## Poids arithmetiques
-        poids = np.arange(lag)[::-1]
+    # On copie pour ne pas modifier directement notre Dataframe
+    df = data.copy(deep=True)
 
-    df["tmp_hist"] = 0
+    df = (
+        df.groupby(["id_nav_flotteur", "annee_visite"])[variable]
+        .sum()
+        .reset_index(name=variable)
+    )
+    df = df.sort_values(by="annee_visite")
 
-    for i in range(
-        0, len(poids)
-    ):  # On boucle sur l'historique et on affecte un poids a chaque visite antérieure
-        df["poids"] = poids[i] * df.groupby([unite])[variable].shift(i + 1)
-        df["tmp_hist"] = df.fillna(0)["tmp_hist"] + df.fillna(0)["poids"]
+    lagged_variable_name = f"{variable}_hist"
+    df[lagged_variable_name] = df.groupby("id_nav_flotteur")[variable].shift(1)
 
-    del df["poids"]
-    df["{}_hist".format(variable)] = df["tmp_hist"]
-    del df["tmp_hist"]
+    df = pd.merge(
+        data,
+        df.drop(columns=[variable]),
+        on=["id_nav_flotteur", "annee_visite"],
+        how="left",
+    )
 
     return df
 
@@ -292,8 +290,8 @@ def process_dataset(prediction_phase=False):
     df = ajout_delai_entre_visites(df)
 
     # Calcul des historiques de prescriptions
-    df = ponderation(df, "nombre_prescriptions", type_poids="poids_airthmetiques")
-    df = ponderation(df, "nombre_prescriptions_majeurs", type_poids="poids_constants")
+    df = lag_variable_by_year(df, "nombre_prescriptions")
+    df = lag_variable_by_year(df, "nombre_prescriptions_majeurs")
     df["nombre_prescriptions_hist"] = df["nombre_prescriptions_hist"].fillna(0)
     df["nombre_prescriptions_majeurs_hist"] = df[
         "nombre_prescriptions_majeurs_hist"
