@@ -10,27 +10,21 @@ Ce dag a pour objet la création d'un dataset
 
 Ce DAG peut être executé seulement à l'intérieur du Ministère de la Transition Ecologique Et Solidaire.
 """
-import os
 import pickle
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
 from airflow import DAG
-from airflow.models import Variable
-from airflow.operators.dummy_operator import DummyOperator
-from airflow.operators.python_operator import PythonOperator
-from helpers import connection_db, default_args, embulk_run, read_sql_query, resolve_env
+
+<<<<<<< HEAD
+from airflow.operators.python import PythonOperator
+from helpers import connection_db, default_args
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import precision_score, recall_score
-from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import MaxAbsScaler, OneHotEncoder, StandardScaler
-from sqlalchemy import create_engine, update
-
-PRESCRIPTIONS_THRESHOLD = 4
+from sklearn.preprocessing import MaxAbsScaler, OneHotEncoder
 
 INPUT_VISITS_PARAMS = [
     "id_nav_flotteur",
@@ -114,6 +108,7 @@ def load_sitrep(engine):
     return pd.read_sql(f"select {', '.join(INPUT_SITREP_PARAMS)} from sitrep", engine)
 
 
+
 def load_navire(engine, prediction_phase=False):
     query = f"select {', '.join(INPUT_NAVIRE_PARAMS)} from navire where longueur_hors_tout < 24"
     if (
@@ -136,9 +131,7 @@ def exporter_df(df: pd.DataFrame, engine, indexes: list = []):
 
 
 def trie_dataset(df):
-    """
-    Retourne un dataset groupé par navire, trié par date de visite
-    """
+    """Retourne un dataset groupé par navire, trié par date de visite"""
     df = df.set_index(["id_nav_flotteur", "date_visite"])
     df = df.sort_index()
     return df.reset_index()
@@ -205,7 +198,7 @@ def ponderation(data, variable, unite="id_nav_flotteur", type_poids="poids_const
     )  # On copie pour ne pas modifier directement notre Dataframe
 
     lag = max(data["id_nav_flotteur"].value_counts())
-    if type_poids is "poids_constants":
+    if type_poids == "poids_constants":
         poids = list(np.ones(lag))[::-1]
     else:  ## Poids arithmetiques
         poids = np.arange(lag)[::-1]
@@ -331,9 +324,7 @@ def process_dataset(prediction_phase=False):
 ## Début Seconde Task - Entrainement du modele de machine learning
 
 
-def chargement_dataset(
-    engine, database="dataset_train", index="id_gin_visite", prediction_phase=False
-):
+def chargement_dataset(engine, database="dataset_train", prediction_phase=False):
     beginning_query = "select id_nav_flotteur, id_gin_visite, longueur_hors_tout, genre_navigation, jauge_oslo, nombre_moteur, num_version, puissance_administrative, materiau_coque, situation_flotteur, type_carburant, type_moteur, annee_visite, sitrep_history, nombre_prescriptions_hist, nombre_prescriptions_majeurs_hist, age, delai_visites"
     ## Renvoi de la cible pour entrainement modele
     if not prediction_phase:
