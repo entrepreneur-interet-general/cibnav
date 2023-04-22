@@ -20,10 +20,10 @@ from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import PythonOperator
 from helpers import connection_db, default_args
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
+from sklearn.linear_model import PoissonRegressor
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import MaxAbsScaler, OneHotEncoder
+from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
 
 INPUT_VISITS_PARAMS = [
     "id_nav_flotteur",
@@ -54,24 +54,23 @@ OUTPUT_CAT_PARAM = [
     "genre_navigation",
     "materiau_coque",
     "situation_flotteur",
-    "type_carburant",
     "type_moteur",
     "idc_gin_categ_navigation",
 ]
+
 OUTPUT_NUM_PARAM = [
-    "annee_visite",
-    "jauge_oslo",
     "longueur_hors_tout",
-    "num_version",
     "puissance_administrative",
     "nombre_prescriptions_hist",
     "nombre_prescriptions_majeurs_hist",
-    "sitrep_history",
     "age",
-    "delai_visites",
 ]
 
-OUTPUT_INT_PARAM = ["nombre_moteur"]
+LOG_PARAM = [
+    "longueur_hors_tout",
+    "puissance_administrative",
+]
+
 
 default_args = default_args({"start_date": datetime(2019, 3, 17, 6, 40), "retries": 0})
 
@@ -345,7 +344,7 @@ def predict_cible(model, X):
     return y_pred, y_prob_pred
 
 
-def create_pipeline():
+def create_preprocessing_pipeline():
     categorical_preprocessing = Pipeline(
         [
             ("imputer_str", SimpleImputer(strategy="constant", fill_value="None")),
@@ -353,25 +352,20 @@ def create_pipeline():
         ]
     )
 
+    log_preprocessing = Pipeline(steps=[(FunctionTransformer(np.log1p))])
+
     numeric_preprocessing = Pipeline(
         steps=[
             ("imputer_num", SimpleImputer(strategy="mean")),
-            ("scaler", MaxAbsScaler()),
-        ]
-    )
-
-    integer_preprocessing = Pipeline(
-        steps=[
-            ("imputer_num", SimpleImputer(strategy="most_frequent")),
-            ("scaler", MaxAbsScaler()),
+            ("scaler", StandardScaler()),
         ]
     )
 
     preprocess = ColumnTransformer(
         [
             ("categorical_preprocessing", categorical_preprocessing, OUTPUT_CAT_PARAM),
+            ("log transformation", log_preprocessing, LOG_PARAM),
             ("numerical_preprocessing", numeric_preprocessing, OUTPUT_NUM_PARAM),
-            ("int_preprocessing", integer_preprocessing, OUTPUT_INT_PARAM),
         ]
     )
     return preprocess
@@ -382,25 +376,33 @@ def train():
 
     df = chargement_dataset(engine, prediction_phase=False)
 
-    previsions = pd.DataFrame(index=df.id_gin_visite)
     del df["id_gin_visite"]
     del df["id_nav_flotteur"]
 
-    preprocess = create_pipeline()
+    df = df[
+        [
+            # cible
+            "cible",
+            # prescriptions passées
+            "nombre_prescriptions_majeurs_hist",
+            "nombre_prescriptions_hist",
+            # Caractéristiques du navire
+            "age",
+            "longueur_hors_tout",
+            "puissance_administrative",
+            "type_moteur",
+            "materiau_coque",
+            # Usage du navire
+            "situation_flotteur",
+            "genre_navigation",
+            "idc_gin_categ_navigation",
+        ]
+    ]
+
     model_pipe = Pipeline(
         [
-            ("preprocess", preprocess),
-            (
-                "RF",
-                RandomForestClassifier(
-                    n_estimators=200,
-                    max_depth=110,
-                    min_samples_split=8,
-                    min_samples_leaf=3,
-                    max_features=3,
-                    bootstrap=True,
-                ),
-            ),
+            ("preprocess", create_preprocessing_pipeline()),
+            ("Poisson glm", PoissonRegressor()),
         ]
     )
 
