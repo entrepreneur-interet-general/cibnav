@@ -1,0 +1,521 @@
+---
+title: "CibNav : construction d'un modèle transparent"
+author:
+  - "Quentin Loridant"
+  - "Pierre Camilleri"
+date: "2023-04-20"
+format:
+  html:
+    embed-resources: true
+    code-fold: true
+    theme:
+      - readable
+      - static/style.scss
+    toc: true
+    toc-depth: 2
+execute:
+  cache: true
+---
+
+
+## Préparation des données
+
+```{r import}
+#| include: false
+#| cache: false
+
+library(dplyr)
+library(RPostgres)
+library(forcats)
+library(rstanarm)
+library(bayesplot)
+
+N_CORES=4
+
+options(mc.cores=N_CORES)
+```
+
+```{r dotenv}
+#| include: false
+#| cache: false
+dotenv::load_dot_env()
+```
+
+```{r connection}
+#| include: false
+con <- dbConnect(
+  RPostgres::Postgres(),
+  dbname = Sys.getenv('EMBULK_POSTGRESQL_DB'),
+  host = Sys.getenv('EMBULK_POSTGRESQL_HOST'),
+  port = Sys.getenv('EMBULK_POSTGRESQL_PORT'),
+  user = Sys.getenv('EMBULK_POSTGRESQL_USER'),
+  password = Sys.getenv('EMBULK_POSTGRESQL_PASSWORD')
+)
+```
+
+```{r load_data}
+df <- tbl(con, "dataset_train") %>%
+  collect()
+```
+
+```{r data_transformations}
+
+df$cible <- as.logical(df$cible)
+df$annee_visite <- as.integer(df$annee_visite)
+df$id_gin_visite <- as.integer(df$id_gin_visite)
+df$sitrep_history <- as.integer(df$sitrep_history)
+df$idc_gin_categ_navigation <- fct_recode(
+  as.factor(df$idc_gin_categ_navigation),
+  "5ème (eaux abritées)"="1",
+  "4ème (5 milles des eaux abritées)"="2",
+  "4ème (5 milles des eaux abritées)"="3",
+  "4ème (5 milles des eaux abritées)"="4",
+  "3ème (20 milles de la terre)"="5",
+  "3ème (20 milles de la terre)"="7",
+  "2ème (200 milles d'un port)"="8",
+  "2ème (200 milles d'un port)"="9",
+  "1ère"="10",
+  "6ème plaisance (2 milles d'un abri)"="11",
+  "5ème plaisance (5 milles d'un abri)"="12",
+  "4ème plaisance (20 milles d'un abri)"="13",
+  "3ème plaisance (60 milles d'un abri)"="14",
+)
+
+df <- df %>%
+  mutate(
+    genre_navigation = fct_lump_min(
+      genre_navigation,
+      min = 500,
+      other_level = "Autre"
+    ),
+    materiau_coque = fct_recode(
+      materiau_coque,
+      METAL = "AG/4 - ALU",
+      METAL = "ACIER",
+      METAL = "ACIER / INOX",
+      METAL = "ALLIAGE LEGER",
+      BOIS = "BOIS MASSIF",
+      BOIS = "BOIS MOULE",
+      BOIS = "CONTREPLAQUE",
+      PLASTIQUE = "POLYESTER EPOXY",
+      PLASTIQUE = "POLYETHYLENE",
+      PLASTIQUE = "PLASTIQUE SANDWICH",
+      NULL = "INCONNU"
+    ),
+    type_carburant = fct_lump_min(
+      type_carburant,
+      min = 500,
+      other_level = "Autre"
+    ),
+    type_moteur = fct_lump_min(
+      type_moteur,
+      min = 500,
+      other_level = "Autre"
+      ),
+  )
+
+df <- df %>%
+  mutate(
+   jauge_oslo = ifelse(jauge_oslo == 0, 1, jauge_oslo),
+   puissance_administrative = ifelse(puissance_administrative == 0, 1,
+                                     puissance_administrative)
+   )
+df$log_jauge_oslo <- log10(df$jauge_oslo)
+df$log_puissance_administrative <- log10(df$puissance_administrative)
+df$log_longueur_hors_tout <- log10(df$longueur_hors_tout)
+df$longueur_lte12 <- (df$longueur_hors_tout <= 12)
+df$longueur_e12 <- (df$longueur_hors_tout > 11.99 & df$longueur_hors_tout < 12.01)
+df$longueur_mt12 <- (df$longueur_hors_tout > 12)
+
+# fonction qui permet de ne garder qu'une observation par navire
+# to_nav <- function(df) {
+#   donnees_navire <- c(
+#     "id_nav_flotteur",
+#     "num_version",
+#     "genre_navigation",
+#     "materiau_coque",
+#     "situation_flotteur",
+#     "type_carburant",
+#     "type_moteur",
+#     "longueur_hors_tout",
+#     "log_longueur_hors_tout",
+#     "jauge_oslo",
+#     "log_jauge_oslo",
+#     "puissance_administrative",
+#     "log_puissance_administrative",
+#     "age",
+#     "longueur_lte12",
+#     "longueur_e12",
+#     "longueur_mt12",
+#     "idc_gin_categ_navigation"
+#   )
+#   df_nav <- df %>%
+#     group_by(id_nav_flotteur) %>%
+#     filter(date_visite == max(date_visite)) %>%
+#     ungroup() %>%
+#     select(any_of(donnees_navire))
+#   return(df_nav)
+# }
+```
+
+# Expérimentation d'une régression poisson simple
+
+```{r model_nb_prescriptions}
+#| output: false
+mod_pois <- stan_glm(
+  nombre_prescriptions_majeurs ~ situation_flotteur,
+  data = df %>%
+    sample_n(1000),
+  family = poisson(link = log)
+)
+```
+
+```{r diagnostics}
+#| fig-cap: "Nombre de visites avec 0 prescriptions majeures, observé et simulé"
+yrep <- posterior_predict(mod_pois)
+
+prop_zero <- function(y) mean(y == 0)
+pp_check(mod_pois, plotfun = "stat", stat = "prop_zero", binwidth = .005)
+```
+
+La proportion de "nombre_prescriptions == 0" n'est pas bien capturée par
+une régression de poisson (surdispersion). Nous essayons donc une distribution plus
+permissive.
+
+# Expérimentation d'une régression négative binomiale
+
+## Entraînement du modèle
+
+```{r prepare_data_for_model}
+df_mod <- df %>%
+  mutate(
+         nombre_prescriptions_majeurs_hist =
+           scale(nombre_prescriptions_majeurs_hist, center = FALSE),
+         nombre_prescriptions_hist =
+           scale(nombre_prescriptions_hist, center = FALSE),
+         age = scale(age, center = FALSE),
+         log_longueur_hors_tout = scale(log_longueur_hors_tout),
+         log_puissance_administrative = scale(log_puissance_administrative)
+         )
+```
+
+Les variables suivant approx une loi normal ont été centrées-réduites, les
+variables positives suivant une distribution de probabilité décroissante ont
+seulement été réduites.
+
+```{r model_nb_prescriptions_2}
+#| output: false
+mod_nb <- stan_glm(
+  nombre_prescriptions_majeurs ~
+    # Prescriptions passées
+    nombre_prescriptions_majeurs_hist +
+    nombre_prescriptions_hist +
+    # Caractéristiques du navire
+    age +
+    log_longueur_hors_tout +
+    longueur_e12 +
+    longueur_mt12 +
+    log_puissance_administrative +
+    type_moteur +
+    # Usage du navire
+    situation_flotteur +
+    genre_navigation +
+    idc_gin_categ_navigation,
+  data = df_mod,
+  family = neg_binomial_2
+)
+```
+
+```{r recall_model_from_cache}
+library(knitr)
+knitr::load_cache(
+  label = "model_nb_prescriptions_2",
+  path = "./3_exploration_glm_cache/html/",
+  dir = ".",
+  envir = globalenv()
+)
+```
+
+## Analyse des coefficients du modèle
+
+```{r helper_coef_fun}
+#| include: false
+
+# Rounded standard deviation
+rsd <- function(v, digits = 0) {
+  return(round(sd(v), digits = digits))
+}
+
+# lower bound of centered 1 standard deviation interval on gaussian
+# distribution
+lb <- function(v) {
+  return(round(quantile(v, probs = c(0.16), na.rm = TRUE)))
+}
+
+# upper bound of centered 1 standard deviation interval on gaussian
+# distribution
+ub <- function(v){
+  return(round(quantile(v, probs = c(0.84), na.rm = TRUE)))
+}
+
+# For interpreting coefficients of variables which take variable 0
+co <- function(name, x = 1, xref = 0) {
+  coefs <- coefficients(mod_nb)
+  return(
+    paste0(
+     round(
+      100 * (exp(coefs[name] * x) - exp(coefs[name] * xref)),
+      digits = 0
+      ),
+    "%"
+    )
+  )
+}
+
+# For interpreting coefficients of variables with log transformation
+# x and xref are given untransformed
+co_log <- function(name, x, xref) {
+  coefs <- coefficients(mod_nb)
+  return(
+   paste0(
+    round(
+      100 * (x ^ coefs[name] - xref ^ coefs[name]),
+      digits = 0
+    ),
+    "%"
+    )
+  )
+}
+```
+
+```{r model_coefs_0}
+coefficients(mod_nb)
+```
+
+### Prescriptions passées
+
+```{r model_coefs_1}
+mcmc_areas(
+  mod_nb,
+  pars = c(
+    "nombre_prescriptions_majeurs_hist",
+    "nombre_prescriptions_hist"
+  ),
+  prob_outer = 0.99
+)
+```
+
+**Exemple d'interprétation** :
+
+- un navire avec `r rsd(df$nombre_prescriptions_majeurs_hist)`
+  prescriptions majeures historiques (pondérées) a en moyenne
+  +`r co("nombre_prescriptions_majeurs_hist")`
+  prescription majeure au contrôle suivant.
+- un navire avec `r rsd(df$nombre_prescriptions_hist)` prescriptions
+  historiques (pondérées) a
+  en moyenne +`r co("nombre_prescriptions_hist")` prescriptions majeures
+
+### Caractéristiques du navire
+
+```{r model_coefs}
+mcmc_areas(
+  mod_nb,
+  pars = c(
+    "age",
+    "log_longueur_hors_tout",
+    "log_puissance_administrative",
+    "type_moteurExplosion",
+    "type_moteurAutre"
+  ),
+  prob_outer = 0.99
+)
+```
+
+
+- **Significativité** :
+  - Toutes les variables sont très significatives, à l'exception du type de
+    moteur "Autre" dont l'incertitude est importante.
+
+- **Exemple d'Interprétation** :
+
+  - Un âge de `r rsd(df$age)` ans aura `r co("age")` mb par rapport à un
+    navire neuf. Cette relation décroissante (toutes choses égales par
+    ailleurs) est intriguante.
+  - Un navire de `r lb(df$longueur_hors_tout)`m aura (en
+    espérance) `r co_log("log_longueur_hors_tout", ub(df$longueur_hors_tout),
+    lb(df$longueur_hors_tout))` prescriptions majeures en plus qu'un navire de
+    `r ub(df$longueur_hors_tout)`m
+  - à longueur égale, une puissance plus élevée aura légèrement moins de PM
+    (ce qui est contre-intuitif).
+  - Un moteur à explosions a en moyenne `r co("type_moteurExplosion")` de prescriptions majeures
+    qu'un moteur à combustion interne.
+
+```{r model_coefs_4}
+mcmc_areas(
+  mod_nb,
+  pars = c(
+    "situation_flotteurFrançais pêche",
+    "genre_navigationNavigation côtière",
+    "genre_navigationPêche côtière",
+    "genre_navigationPetite pêche",
+    "genre_navigationPlaisance NC",
+    "genre_navigationAutre",
+    "idc_gin_categ_navigation4ème (5 milles des eaux abritées)",
+    "idc_gin_categ_navigation3ème (20 milles de la terre)",
+    "idc_gin_categ_navigation2ème (200 milles d'un port)",
+    "idc_gin_categ_navigation1ère"
+  ),
+  prob_outer = 0.99
+)
+```
+
+**Exemple d'interprétation** :
+
+  - Un navire de pêche a en moyenne `r co("situation_flotteurFrançais pêche")`
+    plus de prescriptions majeures qu'un navire de commerce (plaisance inclus).
+  - la navigation côtière a en moyenne
+    `r co("genre_navigationNavigation côtière")` pm de plus.
+  - la pêche côtière, la petite pêche a en moyenne `r
+    co("genre_navigationPetite pêche")` pm (par rapport à la
+    Conchyliculture).
+  - Comparé à la navigation en 5ème catégorie :
+    - navigation en 4ème +`r co("idc_gin_categ_navigation4ème (5 milles des
+      eaux abritées)")` pm
+    - navigation en 3ème +`r co("idc_gin_categ_navigation3ème (20 milles de la terre)")`  pm
+    - navigation en 2ème +`r co("idc_gin_categ_navigation2ème (200 milles d'un port)")` pm
+    - navigation en 1ère > pas beaucoup de différence avec beaucoup d'incertitude
+
+### Variables expérimentales
+
+```{r model_coefs_5}
+mcmc_areas(
+  mod_nb,
+  pars = c(
+    "longueur_e12TRUE",
+    "longueur_mt12TRUE"
+  ),
+  prob_outer = 0.99
+)
+```
+
+- Une grosse incertitude est présente sur un potentiel effet de seuil à 12m,
+  avec une estimation de faible importance.
+- Les navires qui sont exactement au seuil semblent avoir en moyenne +`r
+  co("longueur_e12TRUE")` pm, ce qui est important, mais une incertitude
+  demeure.
+
+
+## Exploration du modèle via des jeux de données simulés
+
+```{r diag_init}
+yrep <- posterior_predict(mod_nb)
+```
+
+Nous entraînons le modèle puis générons des jeux de données, simulés pour les
+diagnostics.
+
+```{r diag_zeros_2}
+prop_zero <- function(y) mean(y == 0)
+pp_check(mod_nb, plotfun = "stat", stat = "prop_zero", binwidth = .005)
+```
+
+Contrairement à la distribution poisson, la distribution négative binomiale
+arrive à très bien capturer le nombre d'observations sans prescription
+majeure.
+
+```{r diag_1prescr_ou_plus_2}
+prop_mte_one <- function(y) mean(y >= 1)
+pp_check(mod_nb, plotfun = "stat", stat = "prop_mte_one", binwidth = .005)
+```
+
+La distribution capture également de manière convaincante le nombre
+d'observations pour lesquelles il y au moins une prescription majeure.
+
+```{r diag_mean}
+prop_mean <- function(y) mean(y)
+pp_check(mod_nb, plotfun = "stat", stat = "prop_mean", binwidth = .005)
+```
+
+La distribution simulée capture bien le nombre moyen de prescriptions majeures.
+
+```{r filtered_data}
+op <- mod_nb$data %>%
+  select(
+    "nombre_prescriptions_majeurs_hist",
+    "nombre_prescriptions_hist",
+    "age",
+    "log_longueur_hors_tout",
+    "longueur_e12",
+    "longueur_mt12",
+    "log_puissance_administrative",
+    "type_moteur",
+    "situation_flotteur",
+    "genre_navigation",
+    "idc_gin_categ_navigation"
+  )
+d <- mod_nb$data[complete.cases(op),]
+```
+
+```{r diag_age}
+age <- d$age * sd(df$age)
+
+ppc_stat_grouped(
+  y = mod_nb$y,
+  yrep = yrep,
+  group = cut(age, c(0,10,20,30,40,50,100), include.lowest = TRUE),
+  stat = "mean",
+  binwidth = .005
+)
+```
+
+Le modèle capture modérément bien la dynamique avec l'âge.
+Le modèle sous-estime le nombre de pm pour la catégorie [10, 20] et surestime
+pour la catégorie [20, 30].
+
+```{r diag_materiau_coque}
+materiau_coque <- d$materiau_coque
+
+notNA <- !is.na(materiau_coque)
+
+ppc_stat_grouped(
+  y = mod_nb$y[notNA],
+  yrep = yrep[, notNA],
+  group = materiau_coque[notNA],
+  stat = "mean",
+  binwidth = .005
+)
+```
+
+Le modèle sous-estime le nombre de pm pour les coques metal et surestime pour
+les coques bois et plastique.
+Le modèle gagnerait à bénéficier de cette information.
+
+```{r diag_categ}
+categ <- d$idc_gin_categ_navigation
+
+ppc_stat_grouped(
+  y = mod_nb$y,
+  yrep = yrep,
+  group = categ,
+  stat = "mean",
+  binwidth = .005
+)
+```
+
+Sans surprise, la dynamique liée à la catégorie de navigation est bien
+représentée par le modèle.
+
+```{r diag_annees}
+annee <- d$annee_visite
+
+ppc_stat_grouped(
+  y = mod_nb$y,
+  yrep = yrep,
+  group = annee,
+  stat = "mean",
+  binwidth = .005
+)
+```
+
+Etonnamment, le modèle exhibe une tendance croissante d'année en année, alors
+que les variations annuelles observées ne le sont pas.

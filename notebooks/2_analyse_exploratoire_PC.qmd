@@ -1,0 +1,605 @@
+---
+title: "CibNav : Analyse exploratoire des données"
+author:
+  - "Quentin Loridant"
+  - "Pierre Camilleri"
+date: "2023-04-18"
+format:
+  html:
+    embed-resources: true
+    code-fold: true
+    theme:
+      - readable
+      - static/style.scss
+    toc: true
+    toc-depth: 2
+execute:
+  cache: true
+---
+
+## Préparation des données
+
+Les données explorées sont celles de l'échantillon d'entraînement.
+
+```{r import}
+#| cache: false
+#| include: false
+
+library(dotenv)
+library(dplyr)
+library(forcats)
+library(ggplot2)
+library(RPostgres)
+
+library(DataExplorer)
+
+library(plotly)
+library(rstanarm)
+library(bayesplot)
+```
+
+```{r dotenv}
+#| include: false
+
+dotenv::load_dot_env()
+```
+
+```{r db_connection}
+#| include: false
+
+con <- dbConnect(
+  RPostgres::Postgres(),
+  dbname = Sys.getenv('EMBULK_POSTGRESQL_DB'),
+  host = Sys.getenv('EMBULK_POSTGRESQL_HOST'),
+  port = Sys.getenv('EMBULK_POSTGRESQL_PORT'),
+  user = Sys.getenv('EMBULK_POSTGRESQL_USER'),
+  password = Sys.getenv('EMBULK_POSTGRESQL_PASSWORD')
+)
+```
+
+```{r load_data}
+df <- tbl(con, "dataset_train") %>%
+  collect()
+```
+
+```{r data_transformation_1}
+#| warning: false
+
+df$cible <- as.logical(df$cible)
+df$annee_visite <- as.integer(df$annee_visite)
+df$id_gin_visite <- as.integer(df$id_gin_visite)
+df$sitrep_history <- as.integer(df$sitrep_history)
+
+df$idc_gin_categ_navigation <- fct_recode(
+  as.factor(df$idc_gin_categ_navigation),
+  "5ème (eaux abritées)"="1",
+  "4ème (5 milles des eaux abritées)"="2",
+  "4ème (5 milles des eaux abritées)"="3",
+  "4ème (5 milles des eaux abritées)"="4",
+  "3ème (20 milles de la terre)"="5",
+  "3ème (20 milles de la terre)"="7",
+  "2ème (200 milles d'un port)"="8",
+  "2ème (200 milles d'un port)"="9",
+  "1ère"="10",
+  "6ème plaisance (2 milles d'un abri)"="11",
+  "5ème plaisance (5 milles d'un abri)"="12",
+  "4ème plaisance (20 milles d'un abri)"="13",
+  "3ème plaisance (60 milles d'un abri)"="14",
+)
+
+# fonction qui permet de ne garder qu'une observation par navire
+to_nav <- function(df) {
+  donnees_navire <- c(
+    "id_nav_flotteur",
+    "num_version",
+    "genre_navigation",
+    "materiau_coque",
+    "situation_flotteur",
+    "type_carburant",
+    "type_moteur",
+    "longueur_hors_tout",
+    "log_longueur_hors_tout",
+    "jauge_oslo",
+    "log_jauge_oslo",
+    "puissance_administrative",
+    "log_puissance_administrative",
+    "age",
+    "longueur_lte12",
+    "longueur_e12",
+    "longueur_mt12",
+    "idc_gin_categ_navigation"
+  )
+
+  df_nav <- df %>%
+    group_by(id_nav_flotteur) %>%
+    filter(date_visite == max(date_visite)) %>%
+    ungroup() %>%
+    select(any_of(donnees_navire))
+
+  return(df_nav)
+}
+```
+
+Les catégories de navigation restreintes sont regroupées avec les non-restreintes.
+
+## Explorations automatiques préliminaires
+
+```{r auto_EDA}
+df_no_log <- df %>% select(!starts_with("log"))
+plot_intro(df_no_log)
+plot_missing(df_no_log)
+```
+
+Valeurs manquantes essentiellement pour : 
+
+- le genre de navigation
+- la jauge oslo
+
+Quelques valeurs manquantes pour :
+
+- les informations moteur (nbre, type, carburant)
+- la puissance admininistrative
+
+```{r auto_EDA_2}
+#| fig-cap: "Histogrammes des variables catégorielles"
+
+exclude <- c(
+  "date_visite",
+  "cible"
+  )
+plot_bar(df %>% select(!any_of(exclude)), ncol = 2L)
+```
+
+Observations :
+
+### `genre_navigation`
+
+- Valeurs multiples agrégées : exemple
+  "Conchyl.Petite Pêche"
+- Pourrait être regroupé en catégories plus générales, par
+  ex : "Cabotage International" + "Cabotage national" < "Cabotage"
+
+### `materiau_coque`
+
+- Divers niveau de précision, par exemple "BOIS" vs "BOIS MASSIF", "BOIS
+  MOULE" ou "CONTREPLAQUE"
+- Valeurs manquantes avec modalité "INCONNU"
+- Queue de modalités avec peu d'observations. À regrouper avec "AUTRES"
+
+### `type_carburant`
+
+- Présence de `NA` ET "INCONNU"
+- Queue de modalités avec peu d'observations. À regrouper avec "AUTRES"
+
+### `type_moteur`
+
+- Queue de modalités avec peu d'observations. À regrouper dans une catégorie "AUTRES"
+
+```{r simplify_cats}
+df <- df %>%
+  mutate(
+    genre_navigation = fct_lump_min(
+      genre_navigation,
+      min = 500,
+      other_level = "Autre"
+    ),
+
+    materiau_coque = fct_recode(
+      materiau_coque,
+      METAL = "AG/4 - ALU",
+      METAL = "ACIER",
+      METAL = "ACIER / INOX",
+      METAL = "ALLIAGE LEGER",
+      BOIS = "BOIS MASSIF",
+      BOIS = "BOIS MOULE",
+      BOIS = "CONTREPLAQUE",
+      PLASTIQUE = "POLYESTER EPOXY",
+      PLASTIQUE = "POLYETHYLENE",
+      PLASTIQUE = "PLASTIQUE SANDWICH",
+      NULL = "INCONNU"
+    ),
+
+    type_carburant = fct_lump_min(
+      type_carburant,
+      min = 500,
+      other_level = "Autre"
+    ),
+
+    type_moteur = fct_lump_min(
+      type_moteur,
+      min = 500,
+      other_level = "Autre"
+      ),
+  )
+```
+
+Les catégories avec peu de modalités ont été regroupées dans une catégorie
+"Autre".
+
+
+```{r auto_EDA_2_bis}
+#| fig-cap: "Histogrammes des variables catégorielles après regroupements de modalités"
+
+plot_bar(df %>% select(!any_of(exclude)))
+```
+
+```{r auto_EDA_3}
+#| fig-cap: "Vérification correspondance genre <> situation flotteur"
+
+plot_bar(to_nav(df) %>% select(genre_navigation, situation_flotteur), by = "situation_flotteur")
+```
+
+À quelques rares exceptions près, la correspondance `genre_navigation` <>
+`situation_flotteur` est assez cohérente.
+
+```{r auto_EDA_4}
+#| fig-cap: "Histogrammes des variables continues"
+include = c(
+  "age",
+  "annee_visite",
+  "jauge_oslo",
+  "longueur_hors_tout",
+  "nombre_prescriptions",
+  "nombre_prescriptions_majeurs",
+  "puissance_administrative"
+  )
+plot_histogram(
+  df %>% select(any_of(include)),
+  geom_histogram_args = list(bins = 50L)
+)
+```
+
+Observations :
+
+- `age` : Distribitution bi-modale avec un mode ~ 15 ans et un pic ~30 ans.
+  Des pics ponctuels s'ajoutent à cette distribution : peut-être des arrondis ?
+
+- `annee_visite` : quasi-uniforme sur 2016 2022 puis très peu d'obs en 2023.
+
+- `jauge_oslo`, `puissance_administrative` - présence de valeurs extrêmes et distribution
+  asymétrique, `longueur_hors_tout` distribution asymétrique. Appliquer une
+  transformation log permet une meilleure analyse des données.
+
+- `longueur_hors_tout` : effet de seuil assez net à 12m.
+
+```{r data_transformation_2}
+df <- df %>%
+  mutate(
+   jauge_oslo = ifelse(jauge_oslo == 0, 1, jauge_oslo),
+   puissance_administrative = ifelse(puissance_administrative == 0, 1,
+                                     puissance_administrative)
+   )
+df$log_jauge_oslo <- log10(df$jauge_oslo)
+df$log_puissance_administrative <- log10(df$puissance_administrative)
+df$log_longueur_hors_tout <- log10(df$longueur_hors_tout)
+
+df$longueur_lte12 <- (df$longueur_hors_tout <= 12)
+df$longueur_e12 <- (df$longueur_hors_tout > 11.99 & df$longueur_hors_tout < 12.01)
+df$longueur_mt12 <- (df$longueur_hors_tout > 12)
+```
+
+On opère les transformations suivantes :
+
+- passage des variables jauge oslo,
+puissance_administrative et longueur_hors_tout au logarithme.
+- ajout de variables booléennes "longueur_lte12", "longueur_e12",
+  "longueur_mt12" pour les longueures inférieures ou égales, strictement
+  égales ou supérieurs au seuil de 12 mètres.
+
+
+```{r auto_EDA_4_bis}
+#| fig-cap: "Histogrammes des variables continues log-transformées"
+plot_histogram(
+  to_nav(df) %>% select(log_jauge_oslo, log_puissance_administrative, log_longueur_hors_tout),
+  geom_histogram_args = list(bins = 100L)
+)
+```
+
+Après transformation, les distributions ont des distributions à peu près
+symétriques (modulo l'effet de seuil).
+
+```{r auto_EDA_5}
+#| fig-cap: "Corrélation entre variables type_moteur et type_carburant"
+include <- c(
+      "type_moteur",
+      "type_carburant"
+      )
+plot_correlation(na.omit(to_nav(df) %>% select(any_of(include)), maxcat = 5L))
+```
+
+```{r auto_EDA_5_bis}
+#| fig-cap: "Corrélation entre variables"
+include <- c(
+      "nombre_prescriptions",
+      "nombre_prescriptions_majeurs",
+      "nombre_prescriptions_hist",
+      "nombre_prescriptions_majeurs_hist",
+      "type_moteur",
+      "situation_flotteur",
+      "log_jauge_oslo",
+      "log_longueur_hors_tout",
+      "log_puissance_administrative",
+      "materiau_coque"
+      )
+plot_correlation(na.omit(df %>% select(any_of(include)), maxcat = 5L))
+```
+
+Sans surprise, on retrouve les corrélations suivantes :
+
+- Le type de moteur et le type carburant sont assez redondants :
+  - explosion <> essence (Il s'agit de plutôt petits navires, avec moins de prescriptions)
+  - combustion <> gazole
+  - moteur éléctrique <> électricité
+- Forte corrélation entre presc majeurs et mineures (idem pour prescriptions
+  historiques)
+- puissance administrative, longueur, jauge_oslo très correlés
+
+Plus surprenant :
+
+- Corrélation à investiguer entre nombre prescriptions et annee visite.
+
+## Lien entre prescriptions mineures et majeures
+
+```{r correl_prescriptions_min_maj}
+#| fig-cap: "Nombre moyen de prescriptions majeures on fonction du nombre de prescriptions mineures"
+ggplot(
+  df %>% sample_n(10000),
+  aes(x = nombre_prescriptions, y = nombre_prescriptions_majeurs),
+) +
+   stat_summary(fun = mean, geom = "col") +
+   xlim(0, 15) +
+   ylim(0, 3)
+```
+
+En moyenne, on trouve environ une prescription majeure pour 10
+presciptions mineures. La relation entre les deux est (quasi-)linéaire.
+
+## Lien entre prescriptions et année de visite
+
+```{r correl_annee_prescriptions_maj}
+#| fig-cap: "Lien entre nombre de prescriptions et année"
+
+ggplot(
+  df %>% sample_n(10000),
+  aes(x = as.numeric(annee_visite), y = nombre_prescriptions_majeurs),
+) +
+   stat_summary(fun = mean, geom = "col")
+```
+
+Le nombre de prescriptions majeures moyen a des variations non négligeables en
+fonction de l'année de visite (moyenne sur 10000 observations, soit plus de
+1000 observations par année).
+
+L'année 2023 semble être légèrement en dessous de la tendance précédente,
+cependant le nombre d'observations est également plus faible que les autres,
+entraînant de fait une plus grande variabilité de l'estimation de la moyenne.
+
+En tout état de cause, ces variations ne nous laissent pas penser qu'il y a
+une anomalie ou un changement de régime sur la durée d'observation.
+
+## Distribution de l'âge
+
+```{r plot_age}
+#| fig-cap: "Distribution de l'âge en fonction du genre de navigation"
+
+ggplot(df, aes(x =age)) +
+  geom_bar()
+ggplot(to_nav(df),
+       aes(x =genre_navigation, y=age)) +
+  geom_violin(draw_quantiles = c(0.25, 0.5, 0.75))
+```
+
+La bi-modalité, surprenante, de l'âge est visible notamment pour les navires de pêche (petite pêche, conchyl,
+pêche côtière).
+
+```{r plot_age_bis}
+#| fig-cap: "Distribution de l'âge en fonction de la catégorie de navigation"
+ggplot(to_nav(df),
+       aes(x = idc_gin_categ_navigation, y=age)) +
+  geom_violin(draw_quantiles = c(0.25, 0.5, 0.75))
+```
+
+Les navires de la première catégorie de navigation sont nettement plus récents
+que pour les autres catégories. La différence entre les autres catégories
+ne semble par contre pas significative.
+
+```{r plot_age_2}
+df_pp <- to_nav(df) %>%
+  filter(
+    genre_navigation %in% c("Petite pêche"),
+    type_moteur %in% c("Explosion", "Combustion Interne")
+  )
+
+p1 <- ggplot(df_pp,
+       aes(x = age, y = puissance_administrative, color = type_moteur)) +
+                 geom_jitter(height = 10, width = 0.5, alpha = 0.5)
+
+p2 <- ggplot(df_pp,
+       aes(x = age, color = type_moteur)) +
+                 geom_density()
+
+bayesplot_grid(p1, p2)
+```
+
+Chacun des modes de la distribution est associé à un type de moteur ! Y a-t-il
+eu un changement législatif ?
+
+## Relation entre longueur et puissance
+
+```{r plot_longueur_puissance}
+#| fig-cap: "Puissance par rapport à la longueur du navire"
+ggplot(
+   to_nav(df),
+   aes(
+     x = log_longueur_hors_tout,
+     y = log_puissance_administrative,
+     color =situation_flotteur
+   )
+ ) +
+   geom_point(alpha = 0.5) +
+   geom_smooth(
+     aes(color = situation_flotteur, group =interaction(situation_flotteur, longueur_mt12)),
+     method="gam"
+   )
+```
+
+Ici on remarque plusieures choses intéressantes :
+
+- Pour les navires commerciaux, il y a deux dynamiques puissance <> longueur
+  très différentes (deux groupes de points rouges qui forment des droites
+  parallèles), bien visibles pour les grandes longueurs.
+- Il y a un effet de seuil important à la limite règlementaire pour les
+  navires commerciaux.
+- Il y a également un certain nombre de valeurs extrêmes de puissance pour des
+  valeurs de longueur ~5m (log_long ~0.8)
+- Enfin, il y a un cluster de valeurs atypiques pour de faibles longueurs.
+
+- Pour les navires de pêches, il semble y avoir plus d'homogénéité, avec une
+  relation quasi linéaire  (rappel : en log-log)
+
+
+```{r plot_longueur_puissance_genre}
+#| fig-cap: "Puissance par rapport à la longueur du navire par genre"
+ggplot(
+   to_nav(df),
+   aes(x = log_longueur_hors_tout, y = log_puissance_administrative, color =genre_navigation),
+   ) +
+    geom_point(
+      position = position_jitter(width= 0.02, height =0.02),
+      alpha = 0.5
+    ) +
+    facet_grid(rows = vars(situation_flotteur))
+```
+
+Avec cette visualisation, on voit même 3 dynamiques :
+
+  - la dynamique du bas représente plutôt des navires de plaisance
+  - La navigation côtière s'insère entre les deux
+  - La dynamique du haut sont des navires étiquetés "Autre", il s'agit de
+    navires de remorquage et de pilotage avec des puissances supérieures.
+  - Les navires de cabotage international sont partagés entre les deux
+
+Concernant le cluster de petits navires :
+
+  - Genre essentiellement inconnu, sauf 2 > Navigation côtière & plaisance.
+    Hypothèse : petits hors bord de navig côtière
+
+Concernant les navires de pêche :
+
+  - Conchyl semble moins puissants en moyenne que petite pêche
+  - Ce qui semble différencier la petite pêche de la pêche côtière semble être
+    la taille du navire.
+
+Autres observations :
+
+- Étonnement, il semble y avoir deux dynamiques pour les navires de
+    plaisance également de longueur hors tout infra seuil
+
+    Hypothèse : deux types de motorisations différentes
+
+## Relation entre puissance et motorisation
+
+```{r plot_longueur_motorisation}
+#| fig-cap: "Distribution de motorisation en fonction de la puissance"
+ggplot(
+   na.omit(to_nav(df)),
+   aes(x = cut_interval(log_puissance_administrative, 10), fill = type_moteur)
+   ) +
+   geom_bar(position = position_fill())
+```
+
+On observe :
+
+  - Plus le navire est puissant, plus il aura tendance à utiliser un moteur à
+    combustion interne.
+
+## Relation entre longueur et jauge oslo
+
+```{r plot_longueur_puissance_jauge}
+#| fig-cap: "Jauge oslo moyenne en fonction de la longueur"
+ggplot(
+    to_nav(df),
+    aes(x = cut_interval(log_longueur_hors_tout, 10), y = log_jauge_oslo)
+    ) +
+    stat_summary(fun = mean, geom = "bar")
+```
+
+Lien très net entre longueur hors tout et jauge oslo (en log-log).
+
+## Exploration du nombre de prescriptions majeures
+
+```{r explo_prescr_by_age}
+#| fig-cap: "Nombre moyen de prescriptions majeures en founction de l'âge (et distribution des navires par âge)"
+age_breaks <- c(0, 10, 20, 30, 40, 50, 60, 150)
+p1 <- ggplot(
+       df,
+       aes(
+         x = cut(age, breaks = age_breaks),
+         y = nombre_prescriptions_majeurs
+       )) +
+  stat_summary(fun = "mean", geom = "col")
+
+p2 <- ggplot(
+  df,
+  aes(
+      x = cut(age, age_breaks)
+      )) +
+  geom_bar()
+
+bayesplot_grid(p1, p2)
+
+```
+
+Variations non monotones des prescriptions majeures avec l'âge :
+
+- Phase croissante entre 0 et 40 ans (nette majorité des navires)
+- Puis phase légèrement décroissante à partir de là.
+
+```{r explo_prescr_by_length}
+#| fig-cap: "Nombre moyen de prescriptions majeures par longueur"
+ggplot(
+       df,
+       aes(
+         x = cut(log_longueur_hors_tout, 10),
+         y = nombre_prescriptions_majeurs
+       )) +
+  stat_summary(fun = "mean", geom = "col")
+```
+
+Variations quasi linéaire des prescr maj avec le log de la
+log_longueur_hors_tout.
+
+```{r explo_prescr_by_genre}
+#| fig-cap: "Nombre moyen de prescriptions majeures par genre de navigation"
+ggplot(
+       df,
+       aes(
+         x = genre_navigation,
+         y = nombre_prescriptions_majeurs
+       )) +
+  stat_summary(fun = "mean", geom = "col")
+```
+
+Les activités de pêche semblent avoir plus de prescriptions majeures. Les activités
+de plaisance en ont le moins. À noter que la pêche côtière a aussi les plus
+grands navires, et nous avons vu que cela entraîne un plus grand nombre de
+prescriptions.
+
+```{r explo_prescr_by_category}
+#| fig-cap: "Nombre moyen de prescriptions majeures par categorie de navigation"
+ggplot(
+       df,
+       aes(
+         x = idc_gin_categ_navigation,
+         y = nombre_prescriptions_majeurs
+       )) +
+  stat_summary(fun = "mean", geom = "col")
+```
+
+Le nombre de prescriptions majeures augmente nettement avec la catégorie de
+navigation : plus elle est permissive, plus le nombre de prescriptions est
+important.
+
+Une exception notable : la 1ère catégorie de navigation a relativement peu de
+prescriptions majeures. On peut faire le lien avec l'âge de la flotte beaucoup
+plus jeune constatée pour cette catégorie.
