@@ -100,3 +100,36 @@ Nous utilisons l'outil poetry pour gérer les dépendances et le packaging.
 - Activer le shell `poetry shell`
 - Installer le reste des dépendances (notamment airflow qui ne supporte pas 
   poetry) via `pip install -r requirements.txt`
+
+
+### Déploiement
+
+#### Sans mise à jour des données
+
+Nécessite sur le serveurs les fichiers suivants :
+* scripts/setup_db.sh
+* docker-compose.yml
+* dump/cibnav.tar
+* dump/metabase.tar
+
+Nécessite les variables d'environnement suivantes :
+* PGPASSWORD (mot de passe de la base de données pour l'utilisateur postgres)
+* POSTGRES_PASSWORD (mot de passe de la base de données pour l'utilisateur cibnav, si la base n'est pas encore crée, le mot de passe sera initialisé avec cette valeur)
+* METABASE_DB_PASSWORD (mot de passe de la base de données pour l'utilisateur metabase, si la base n'est pas encore crée, le mot de passe sera initialisé avec cette valeur)
+
+```sh
+
+```
+
+Mettre a jour les variables d'environnement dans le fichier `/etc/postgresql/9.6/main/postgresql.conf` en remplaçant la ligne :
+
+```sh
+host all all all scram-sha-256 
+```
+
+par :
+```sh
+host all all all trust 
+```
+
+<!> Attention, cette ligne permet d'accepter les connexions sans mot de passe, il faut donc être sûr que le serveur est bien sécurisé.
