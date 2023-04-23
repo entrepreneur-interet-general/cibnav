@@ -15,6 +15,10 @@ dump-data:
 dump-metabase-config:
 	@ docker exec $(CURRENT_DIRECTORY)-mb-postgres-1 ash -c "PGPASSWORD=$(MB_POSTGRES_PASSWORD) pg_dump -h mb-postgres --format=c -U metabase -W > /home/data/metabase.tar"
 
+dump-docker-images:
+	@ sudo docker save -o docker/image-postgres.tar postgres:15.2-alpine
+	@ sudo docker save -o docker/image-metabase.tar metabase/metabase:v0.45.0
+
 run-metabase:
 	@ docker compose up --build
 
