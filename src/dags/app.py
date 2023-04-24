@@ -17,20 +17,15 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 from airflow import DAG
-from airflow.models import Variable
-from airflow.operators.dummy_operator import DummyOperator
-from airflow.operators.python_operator import PythonOperator
-from helpers import connection_db, default_args, embulk_run, read_sql_query, resolve_env
+from airflow.operators.empty import EmptyOperator
+from airflow.operators.python import PythonOperator
+from helpers import connection_db, default_args
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import precision_score, recall_score
-from sklearn.model_selection import train_test_split
+from sklearn.linear_model import PoissonRegressor
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import MaxAbsScaler, OneHotEncoder, StandardScaler
-from sqlalchemy import create_engine, update
+from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
 
-PRESCRIPTIONS_THRESHOLD = 4
 
 INPUT_VISITS_PARAMS = [
     "id_nav_flotteur",
@@ -61,24 +56,23 @@ OUTPUT_CAT_PARAM = [
     "genre_navigation",
     "materiau_coque",
     "situation_flotteur",
-    "type_carburant",
     "type_moteur",
     "idc_gin_categ_navigation",
 ]
+
 OUTPUT_NUM_PARAM = [
-    "annee_visite",
-    "jauge_oslo",
     "longueur_hors_tout",
-    "num_version",
     "puissance_administrative",
     "nombre_prescriptions_hist",
     "nombre_prescriptions_majeurs_hist",
-    "sitrep_history",
     "age",
-    "delai_visites",
 ]
 
-OUTPUT_INT_PARAM = ["nombre_moteur"]
+LOG_PARAM = [
+    "longueur_hors_tout",
+    "puissance_administrative",
+]
+
 
 default_args = default_args({"start_date": datetime(2019, 3, 17, 6, 40), "retries": 0})
 
@@ -136,9 +130,8 @@ def exporter_df(df: pd.DataFrame, engine, indexes: list = []):
 
 
 def trie_dataset(df):
-    """
-    Retourne un dataset groupé par navire, trié par date de visite
-    """
+    """Retourne un dataset groupé par navire, trié par date de visite"""
+
     df = df.set_index(["id_nav_flotteur", "date_visite"])
     df = df.sort_index()
     return df.reset_index()
@@ -193,48 +186,63 @@ def recode_categ(categ):
     return categ.replace(mapping)
 
 
-def ponderation(data, variable, unite="id_nav_flotteur", type_poids="poids_constants"):
+def recode_materiau_coque(materiau_coque):
+    mapping = {
+        "AG/4 - ALU": "METAL",
+        "ACIER": "METAL",
+        "ACIER / INOX": "METAL",
+        "ALLIAGE LEGER": "METAL",
+        "BOIS MASSIF": "BOIS",
+        "BOIS MOULE": "BOIS",
+        "CONTREPLAQUE": "BOIS",
+        "POLYESTER EPOXY": "PLASTIQUE",
+        "POLYETHYLENE": "PLASTIQUE",
+        "PLASTIQUE SANDWICH": "PLASTIQUE",
+        "INCONNU": None,
+    }
+
+    return materiau_coque.replace(mapping)
+
+
+def recode_type_moteur(type_moteur):
+    type_moteur.loc[
+        np.logical_and(type_moteur != "Explosion", type_moteur != "Combustion interne")
+    ] = "Autre"
+    return type_moteur
+
+
+def lag_variable_by_year(data, variable):
     """
-    Cette fonction permet de selectionner un vecteur et de ponderer son historique en fonction
-    de poids.
-
-    Pre-requis : Dataset trie par navire et par date de visite
+    Cette fonction permet de créer une nouvelle variable (avec le suffixe
+    "_hist") qui contient la valeur de l'année précédente (sommée si plusieurs
+    observations.
     """
-    df = data.copy(
-        deep=True
-    )  # On copie pour ne pas modifier directement notre Dataframe
 
-    lag = max(data["id_nav_flotteur"].value_counts())
-    if type_poids is "poids_constants":
-        poids = list(np.ones(lag))[::-1]
-    else:  ## Poids arithmetiques
-        poids = np.arange(lag)[::-1]
+    # On copie pour ne pas modifier directement notre Dataframe
+    df = data.copy(deep=True)
 
-    df["tmp_hist"] = 0
+    df = (
+        df.groupby(["id_nav_flotteur", "annee_visite"])[variable]
+        .sum()
+        .reset_index(name=variable)
+    )
+    df = df.sort_values(by="annee_visite")
 
-    for i in range(
-        0, len(poids)
-    ):  # On boucle sur l'historique et on affecte un poids a chaque visite antérieure
-        df["poids"] = poids[i] * df.groupby([unite])[variable].shift(i + 1)
-        df["tmp_hist"] = df.fillna(0)["tmp_hist"] + df.fillna(0)["poids"]
+    lagged_variable_name = f"{variable}_hist"
+    df[lagged_variable_name] = df.groupby("id_nav_flotteur")[variable].shift(1)
 
-    del df["poids"]
-    df["{}_hist".format(variable)] = df["tmp_hist"]
-    del df["tmp_hist"]
-
+    df = pd.merge(
+        data,
+        df.drop(columns=[variable]),
+        on=["id_nav_flotteur", "annee_visite"],
+        how="left",
+    )
     return df
 
 
-# Création de la cible au moins une préscription majeure ou au moins 4 mineurs
+# Création de la cible au moins une prescription majeure ou au moins 4 mineurs
 def creation_cibles(df: pd.DataFrame):
-    df["cible"] = (
-        df["nombre_prescriptions_majeurs"]
-        .apply(lambda x: "1" if x > 0 else "0")
-        .astype(int)
-    )
-    df["cible"] = df["cible"] | df["nombre_prescriptions"].apply(
-        lambda x: "1" if x >= PRESCRIPTIONS_THRESHOLD else "0"
-    ).astype(int)
+    df["cible"] = df["nombre_prescriptions_majeurs"]
     return df
 
 
@@ -250,9 +258,6 @@ def creation_visite_simulee(visites):
             "annee_construction": visites[visites["id_nav_flotteur"] == navire][
                 "annee_construction"
             ].max(),
-            "nombre_moteur": visites[visites["id_nav_flotteur"] == navire][
-                "nombre_moteur"
-            ].max(),
             "nombre_prescriptions_majeurs": 0,
         }
         for param in OUTPUT_CAT_PARAM + OUTPUT_NUM_PARAM:
@@ -267,7 +272,7 @@ def creation_visite_simulee(visites):
                 ligne[param] = visites[visites["id_nav_flotteur"] == navire][
                     param
                 ].max()
-        tmp = tmp.append(ligne, ignore_index=True)
+        tmp = pd.concat([tmp, pd.DataFrame([ligne])], ignore_index=True)
     return tmp
 
 
@@ -308,8 +313,8 @@ def process_dataset(prediction_phase=False):
     df = ajout_delai_entre_visites(df)
 
     # Calcul des historiques de prescriptions
-    df = ponderation(df, "nombre_prescriptions", type_poids="poids_airthmetiques")
-    df = ponderation(df, "nombre_prescriptions_majeurs", type_poids="poids_constants")
+    df = lag_variable_by_year(df, "nombre_prescriptions")
+    df = lag_variable_by_year(df, "nombre_prescriptions_majeurs")
     df["nombre_prescriptions_hist"] = df["nombre_prescriptions_hist"].fillna(0)
     df["nombre_prescriptions_majeurs_hist"] = df[
         "nombre_prescriptions_majeurs_hist"
@@ -319,6 +324,9 @@ def process_dataset(prediction_phase=False):
     del df["annee_construction"]
 
     df["idc_gin_categ_navigation"] = recode_categ(df["idc_gin_categ_navigation"])
+    df["materiau_coque"] = recode_materiau_coque(df["materiau_coque"])
+    df["type_moteur"] = recode_type_moteur(df["type_moteur"])
+
 
     if not prediction_phase:  ## Pour l entrainement du modele
         df = creation_cibles(df)
@@ -332,20 +340,25 @@ def process_dataset(prediction_phase=False):
 
 
 def chargement_dataset(
-    engine, database="dataset_train", index="id_gin_visite", prediction_phase=False
+    engine, columns, database="dataset_train", prediction_phase=False
 ):
-    beginning_query = "select id_nav_flotteur, id_gin_visite, longueur_hors_tout, genre_navigation, jauge_oslo, nombre_moteur, num_version, puissance_administrative, materiau_coque, situation_flotteur, type_carburant, type_moteur, annee_visite, sitrep_history, nombre_prescriptions_hist, nombre_prescriptions_majeurs_hist, age, delai_visites"
+    query = f"select {', '.join(columns)}"
     ## Renvoi de la cible pour entrainement modele
     if not prediction_phase:
-        df = pd.read_sql("{}, cible  from {}".format(beginning_query, database), engine)
+        df = pd.read_sql("{}, cible  from {}".format(query, database), engine)
     else:
-        df = pd.read_sql("{} from {}".format(beginning_query, database), engine)
+        df = pd.read_sql("{} from {}".format(query, database), engine)
 
-    df["situation_flotteur"] = df["situation_flotteur"].astype(str)
-    df["genre_navigation"] = df["genre_navigation"].astype(str)
-    df["type_moteur"] = df["type_moteur"].astype(str)
-    df["type_carburant"] = df["type_carburant"].astype(str)
-    df["materiau_coque"] = df["materiau_coque"].astype(str)
+    if "situation_flotteur" in df:
+        df["situation_flotteur"] = df["situation_flotteur"].astype(str)
+    if "genre_navigation" in df:
+        df["genre_navigation"] = df["genre_navigation"].astype(str)
+    if "type_moteur" in df:
+        df["type_moteur"] = df["type_moteur"].astype(str)
+    if "type_carburant" in df:
+        df["type_carburant"] = df["type_carburant"].astype(str)
+    if "materiau_coque" in df:
+        df["materiau_coque"] = df["materiau_coque"].astype(str)
     return df
 
 
@@ -360,12 +373,10 @@ def split_target(df, prediction_phase=False):
 
 def predict_cible(model, X):
     y_pred = model.predict(X)
-    y_pred_prob_tmp = model.predict_proba(X)
-    y_prob_pred = [item[1] for item in y_pred_prob_tmp]
-    return y_pred, y_prob_pred
+    return y_pred
 
 
-def create_pipeline():
+def create_preprocessing_pipeline():
     categorical_preprocessing = Pipeline(
         [
             ("imputer_str", SimpleImputer(strategy="constant", fill_value="None")),
@@ -373,25 +384,30 @@ def create_pipeline():
         ]
     )
 
-    numeric_preprocessing = Pipeline(
+    log_preprocessing = Pipeline(
         steps=[
             ("imputer_num", SimpleImputer(strategy="mean")),
-            ("scaler", MaxAbsScaler()),
+            ("log_transform", FunctionTransformer(np.log1p)),
+            ("scaler", StandardScaler()),
         ]
     )
 
-    integer_preprocessing = Pipeline(
+    numeric_preprocessing = Pipeline(
         steps=[
-            ("imputer_num", SimpleImputer(strategy="most_frequent")),
-            ("scaler", MaxAbsScaler()),
+            ("imputer_num", SimpleImputer(strategy="mean")),
+            ("scaler", StandardScaler()),
         ]
     )
 
     preprocess = ColumnTransformer(
         [
             ("categorical_preprocessing", categorical_preprocessing, OUTPUT_CAT_PARAM),
-            ("numerical_preprocessing", numeric_preprocessing, OUTPUT_NUM_PARAM),
-            ("int_preprocessing", integer_preprocessing, OUTPUT_INT_PARAM),
+            (
+                "numerical_preprocessing",
+                numeric_preprocessing,
+                [v for v in OUTPUT_NUM_PARAM if v not in LOG_PARAM],
+            ),
+            ("log_transformation", log_preprocessing, LOG_PARAM),
         ]
     )
     return preprocess
@@ -400,27 +416,14 @@ def create_pipeline():
 def train():
     engine = connection_db()
 
-    df = chargement_dataset(engine, prediction_phase=False)
+    df = chargement_dataset(
+        engine, columns=OUTPUT_NUM_PARAM + OUTPUT_CAT_PARAM, prediction_phase=False
+    )
 
-    previsions = pd.DataFrame(index=df.id_gin_visite)
-    del df["id_gin_visite"]
-    del df["id_nav_flotteur"]
-
-    preprocess = create_pipeline()
     model_pipe = Pipeline(
         [
-            ("preprocess", preprocess),
-            (
-                "RF",
-                RandomForestClassifier(
-                    n_estimators=200,
-                    max_depth=110,
-                    min_samples_split=8,
-                    min_samples_leaf=3,
-                    max_features=3,
-                    bootstrap=True,
-                ),
-            ),
+            ("preprocess", create_preprocessing_pipeline()),
+            ("Poisson glm", PoissonRegressor()),
         ]
     )
 
@@ -429,7 +432,7 @@ def train():
     model = model_pipe.fit(x, y)
 
     # Saving model
-    pickle.dump(model, open("/opt/etl/airflow/modeles/cibnav_ml_v3.pkle", "wb"))
+    pickle.dump(model, open("./dump/cibnav_ml_v4.pkle", "wb"))
 
 
 ## Début Troisième Task - Génération d un jeu de donnees qui simule pour chaque navire une visite de securite aujourd hui
@@ -446,38 +449,62 @@ def export_dataset_predict():
     df.to_sql("dataset_predict", engine, if_exists="replace", index=False)
 
 
-## Début Quatrieme Task - Prévision sur la flotte actuelle et priorisation
+def feature_contributions(model_pipe, data):
+    """Calcul des contributions de chaque variable au score final
 
+    Cette fonction multiplie les coefficients du modèle avec chaque variable
+    de chaque observation, puis passe à l'exponentielle.
+
+    Il en résulte des contributions multiplicatives à la prédiction finale,
+    c'est à dire qu'une contribution de 1.2 peut s'interpréter comme "Fait
+    augmenter de 20% la prédiction".
+
+    Params:
+    - model_pipe: pipeline sklearn entraînée, avec étapes "preprocess"
+      (préparation des données) et "Poisson glm" (modèle).
+    - data: données sur lesquels décomposer la prédiction.
+
+    Return: np.array. Matrice des contributions individuelles de chaque
+    feature pour chaque observation. Dimension : (n observation * k features).
+    """
+    preprocessed_data = model_pipe["preprocess"].transform(data).todense()
+    n_features = preprocessed_data.shape[1]
+    multiplier = np.zeros((n_features, n_features), np.float64)
+    np.fill_diagonal(multiplier, model_pipe["Poisson glm"].coef_)
+    return np.exp(np.matmul(preprocessed_data, multiplier))
+
+
+## Début Quatrieme Task - Prévision sur la flotte actuelle et priorisation
 
 def prediction_flotte():
     engine = connection_db()
     df = chargement_dataset(
         engine,
+        columns=OUTPUT_NUM_PARAM + OUTPUT_CAT_PARAM + ["id_nav_flotteur"],
         database="dataset_predict",
-        index="id_nav_flotteur",
         prediction_phase=True,
     )
 
     previsions = pd.DataFrame(index=df.id_nav_flotteur)
 
-    del df["id_gin_visite"]
     del df["id_nav_flotteur"]
 
-    model_pipe = pickle.load(open("/opt/etl/airflow/modeles/cibnav_ml_v3.pkle", "rb"))
-    y_pred, y_prob_pred = predict_cible(model_pipe, df)
+    model_pipe = pickle.load(open("./dump/cibnav_ml_v4.pkle", "rb"))
+    y_pred = predict_cible(model_pipe, df)
     previsions["prevision"] = y_pred
-    previsions["probabilite"] = y_prob_pred
 
-    previsions = previsions.sort_values(by="probabilite", ascending=False)
+    contribs = feature_contributions(model_pipe, df)
+
+    previsions = previsions.sort_values(by="prevision", ascending=False)
     previsions["ranking"] = np.arange(start=1, stop=len(previsions) + 1)
     previsions.to_sql(
-        "score_v3",
+        "score_v4",
         engine,
         if_exists="replace",
     )
 
 
-## Definition des task Aiflow
+## Definition des task Airflow
 
 task_process_data = PythonOperator(
     task_id="process_training_data",
@@ -505,8 +532,8 @@ task_prediction_visites = PythonOperator(
 )
 
 ## Ordre des taches Airflow
-start = DummyOperator(task_id="start", dag=dag)
-end = DummyOperator(task_id="end", dag=dag)
+start = EmptyOperator(task_id="start", dag=dag)
+end = EmptyOperator(task_id="end", dag=dag)
 
 task_process_data.set_upstream(start)
 task_dataset_flotte.set_upstream(start)
