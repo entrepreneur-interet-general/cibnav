@@ -1,4 +1,4 @@
-/* Attention : les commentaires introduits avec '--' ne fonctionnent pas en passant par Airflow */
+/* Attention : les commentaires introduits avec '--' ne fonctionnent pas en passant par Airflow */-table avis --exclude-table user_account --exclude-table agent --exclude-table avis_id_seq --exclude-table user_
 
 /* Requête qui extrait les données sur les navires contenues dans :
  - NAVPRO.NAV_FLOTTEUR, NAVPRO.NAV_NAVIRE_FRANCAIS, NAVPRO.NAV_PA, NAV_CODE_STATUT_FLOTTEUR,NAVPRO.NAV_CODE_STATUT_PA
@@ -61,7 +61,7 @@ navire_version_recent as (
   LEFT JOIN GINA.GIN_CODE_UNITE ON GINA.GIN_CODE_UNITE.IDC_GIN_UNITE = IDC_GIN_CENTRE_SECU_GESTION
   WHERE ordre_antichronologique = 1
 ),
-/* Recuperer la version de Gina Certificats de Franc Bord la plus récente (1 = la plus récente) 
+/* Recuperer la version de Gina Certificats de Franc Bord la plus récente (1 = la plus récente)
 La sous requete suivante ne permet pas ici de récupérer le certificat franc bord associé à un navire en raison du filtre sur l'IDC_GIN_CERTIFICAT à la fin de la requete
 */
 certificat_franc_bord as (
@@ -104,38 +104,38 @@ statut_navire as (
   ON COMMUN.C_CODE_GENRE_NAVIGATION.IDC_GENRE_NAVIGATION = statut_code.IDC_GENRE_NAVIGATION
 ),
 
-/*Recupération des informations sur les visites suivantes : Date de la visite, Nb de jours depuis la dernière visite et lieu de la dernière visite*/ 
+/*Recupération des informations sur les visites suivantes : Date de la visite, Nb de jours depuis la dernière visite et lieu de la dernière visite*/
 info_derniere_visite as (
 SELECT  NUM_IMMAT, DATE_DE_VISITE, DELAI_VISITE, LIEU_VISITE
-	FROM (
-	SELECT
-		GIN_VISITE.NUM_IMMAT as NUM_IMMAT,
-		GIN_VISITE.DATE_VISITE AS DATE_DE_VISITE,
-		CAST(CURRENT_DATE - GIN_VISITE.DATE_VISITE AS INT) AS DELAI_VISITE,
-		GIN_VISITE.LIEU AS LIEU_VISITE,
-		ROW_NUMBER() OVER( PARTITION BY GIN_VISITE.NUM_IMMAT
-		                 ORDER BY GIN_VISITE.DATE_VISITE desc) AS ORDRE_ANTICHRO
-		FROM GIN_VISITE )
-		WHERE ORDRE_ANTICHRO = 1
+        FROM (
+        SELECT
+                GIN_VISITE.NUM_IMMAT as NUM_IMMAT,
+                GIN_VISITE.DATE_VISITE AS DATE_DE_VISITE,
+                CAST(CURRENT_DATE - GIN_VISITE.DATE_VISITE AS INT) AS DELAI_VISITE,
+                GIN_VISITE.LIEU AS LIEU_VISITE,
+                ROW_NUMBER() OVER( PARTITION BY GIN_VISITE.NUM_IMMAT
+                                 ORDER BY GIN_VISITE.DATE_VISITE desc) AS ORDRE_ANTICHRO
+                FROM GIN_VISITE )
+                WHERE ORDRE_ANTICHRO = 1
 ),
 
 /*Recuperation des differents champs afin de pouvoir proposer plus de details et de filtres sur Metabase */
 /*NB : Ces champs ne sont pas utilises pour l'apprentissage du modele */
 navire_detail as (
-  SELECT GIN_VUE_NAVIRE_DETAIL.ID_NAV_FLOTTEUR, 
-	GIN_VUE_NAVIRE_DETAIL.ENGIN_PRINCIPAL, 
-	GIN_VUE_NAVIRE_DETAIL.LIB_ENGIN_PRINCIPAL, 
-	GIN_VUE_NAVIRE_DETAIL.IDC_CATEG_ENGIN_PRINCIPAL, 
-	GIN_VUE_NAVIRE_DETAIL.LIB_CATEG_ENGIN_PRINCIPAL, 
-	GIN_VUE_NAVIRE_DETAIL.IDC_NATURE_ENGIN_PRINCIPAL, 
-	GIN_VUE_NAVIRE_DETAIL.LIB_NATURE_ENGIN_PRINCIPAL, 
-  	GIN_VUE_NAVIRE_DETAIL.IDC_CATEG_ENGIN_SECONDAIRE,
-  	GIN_VUE_NAVIRE_DETAIL.LIB_CATEG_ENGIN_SECONDAIRE,
-  	GIN_VUE_NAVIRE_DETAIL.LIB_NATURE_ENGIN_SECONDAIRE,
-  	GIN_VUE_NAVIRE_DETAIL.IDC_NATURE_ENGIN_SECONDAIRE
+  SELECT GIN_VUE_NAVIRE_DETAIL.ID_NAV_FLOTTEUR,
+        GIN_VUE_NAVIRE_DETAIL.ENGIN_PRINCIPAL,
+        GIN_VUE_NAVIRE_DETAIL.LIB_ENGIN_PRINCIPAL,
+        GIN_VUE_NAVIRE_DETAIL.IDC_CATEG_ENGIN_PRINCIPAL,
+        GIN_VUE_NAVIRE_DETAIL.LIB_CATEG_ENGIN_PRINCIPAL,
+        GIN_VUE_NAVIRE_DETAIL.IDC_NATURE_ENGIN_PRINCIPAL,
+        GIN_VUE_NAVIRE_DETAIL.LIB_NATURE_ENGIN_PRINCIPAL,
+        GIN_VUE_NAVIRE_DETAIL.IDC_CATEG_ENGIN_SECONDAIRE,
+        GIN_VUE_NAVIRE_DETAIL.LIB_CATEG_ENGIN_SECONDAIRE,
+        GIN_VUE_NAVIRE_DETAIL.LIB_NATURE_ENGIN_SECONDAIRE,
+        GIN_VUE_NAVIRE_DETAIL.IDC_NATURE_ENGIN_SECONDAIRE
   FROM GIN_VUE_NAVIRE_DETAIL
   RIGHT JOIN (
-  SELECT id_nav_flotteur, MAX(date_creation_version) keep (dense_rank first order by rownum) date_creation_version 
+  SELECT id_nav_flotteur, MAX(date_creation_version) keep (dense_rank first order by rownum) date_creation_version
   FROM GIN_VUE_NAVIRE_DETAIL
   GROUP BY id_nav_flotteur
   ) unique_navire
@@ -147,15 +147,25 @@ navire_detail as (
 /* Nous eliminons ici le navire Testing qui est un navire fictif utilisé sous GINA auquel est, en particulier, associé un certificat Clause de revoyure */
   AND unique_navire.ID_NAV_FLOTTEUR != '1678826'
 ),
+
 /*Recuperation des differents champs afin de pouvoir proposer plus de details sur Metabase notamment concernant l'effectif du navire */
-navire_categ as (
-  SELECT DISTINCT GIN_NAVIRE_CATEG_NAVIG.NUM_IMMAT, GIN_NAVIRE_CATEG_NAVIG.NUM_VERSION, GIN_NAVIRE_CATEG_NAVIG.EFFECTIF_MINIMUM
-  FROM GIN_NAVIRE_CATEG_NAVIG
-  RIGHT JOIN (
-	SELECT DISTINCT num_immat, MAX(num_version) num_version FROM GIN_NAVIRE_CATEG_NAVIG GROUP BY num_immat
-  ) unique_version
-  ON unique_version.num_immat = GIN_NAVIRE_CATEG_NAVIG.num_immat AND unique_version.num_version = GIN_NAVIRE_CATEG_NAVIG.num_version
+tmp_unique_categ_navig AS (
+    SELECT DISTINCT
+        num_immat,
+        first_value(id_gin_navire_categ_navig) OVER (
+          PARTITION BY num_immat
+          ORDER BY num_version DESC,
+            idc_gin_categ_navigation DESC
+        ) AS id_gin_navire_categ_navig
+    FROM GIN_NAVIRE_CATEG_NAVIG
+        ),
+navire_categ AS (
+        SELECT DISTINCT GIN_NAVIRE_CATEG_NAVIG.NUM_IMMAT, GIN_NAVIRE_CATEG_NAVIG.NUM_VERSION, GIN_NAVIRE_CATEG_NAVIG.EFFECTIF_MINIMUM, GIN_NAVIRE_CATEG_NAVIG.idc_gin_categ_navigation
+        FROM GIN_NAVIRE_CATEG_NAVIG
+        RIGHT JOIN tmp_unique_categ_navig
+        ON tmp_unique_categ_navig.id_gin_navire_categ_navig = GIN_NAVIRE_CATEG_NAVIG.id_gin_navire_categ_navig
 )
+
 
 /* Début Requête centrale
    Attendu en sortie : Une entrée par navire actif du projet cibnav
@@ -180,7 +190,7 @@ SELECT
   NAVPRO.NAV_NAVIRE_FRANCAIS.JAUGE_LONDRES,
   NAVPRO.NAV_NAVIRE_FRANCAIS.JAUGE_NETTE,
   NAVPRO.NAV_NAVIRE_FRANCAIS.JAUGE_OSLO,
-  NAVPRO.NAV_CODE_TYPE_MOTEUR.LIBELLE as type_moteur,  
+  NAVPRO.NAV_CODE_TYPE_MOTEUR.LIBELLE as type_moteur,
   NAVPRO.NAV_CODE_ORIGINE.LIBELLE as origine,
   COMMUN.C_CODE_MATERIAU_COQUE.LIBELLE as materiau_coque,
   COMMUN.C_CODE_CARBURANT.LIBELLE as type_carburant,
@@ -210,13 +220,14 @@ SELECT
   navire_detail.idc_categ_engin_principal,
   navire_detail.lib_categ_engin_principal,
   navire_detail.idc_nature_engin_principal,
-  navire_detail.lib_nature_engin_principal, 
+  navire_detail.lib_nature_engin_principal,
   navire_detail.idc_categ_engin_secondaire,
   navire_detail.lib_categ_engin_secondaire,
   navire_detail.lib_nature_engin_secondaire,
   navire_detail.idc_nature_engin_secondaire,
   certificat_franc_bord.DATE_EXPIRATION as expiration_franc_bord,
   certificat_franc_bord.IDC_GIN_ETAT_CERTIFICAT as etat_certificat,
+  navire_categ.IDC_GIN_CATEG_NAVIGATION,
   statut_navire.genre_navigation
 FROM
   NAVPRO.NAV_FLOTTEUR
@@ -274,12 +285,12 @@ LEFT JOIN info_derniere_visite
 ON info_derniere_visite.NUM_IMMAT= NAVPRO.NAV_FLOTTEUR.NUM_IMMAT_FRANCAIS
 
 /* Jointure pour avoir des détails sur les navires*/
-LEFT JOIN navire_detail 
-ON navire_detail.ID_NAV_FLOTTEUR = NAVPRO.NAV_FLOTTEUR.ID_NAV_FLOTTEUR 
+LEFT JOIN navire_detail
+ON navire_detail.ID_NAV_FLOTTEUR = NAVPRO.NAV_FLOTTEUR.ID_NAV_FLOTTEUR
 
 /* Jointure pour avoir des détails sur les categories des navires*/
-/*RIGHT JOIN  navire_categ
-ON navire_categ.NUM_IMMAT = NAVPRO.NAV_FLOTTEUR.NUM_IMMAT_FRANCAIS */
+RIGHT JOIN  navire_categ
+ON navire_categ.NUM_IMMAT = NAVPRO.NAV_FLOTTEUR.NUM_IMMAT_FRANCAIS
 
 
 /* ---------      JOINTURES POUR FILTRER       ---------------------- */
@@ -295,7 +306,7 @@ LEFT JOIN NAVPRO.NAV_CODE_STATUT_FLOTTEUR ON NAVPRO.NAV_FLOTTEUR.idc_statut_flot
 WHERE
   NAVPRO.NAV_CODE_SITUATION.idc_situation in (2, 3, 4, 5)
   AND NAVPRO.NAV_CODE_STATUT_FLOTTEUR.idc_statut_flotteur in (1, 2)
-  AND NAVPRO.NAV_NAVIRE_FRANCAIS.est_dernier = 1 
+  AND NAVPRO.NAV_NAVIRE_FRANCAIS.est_dernier = 1
   AND pn_statut.idc_certificat in (47,67,68,69,1007)
   AND ((pn_statut.idc_etat_certificat <=3) or (pn_statut.idc_etat_certificat=6))
-  
+
