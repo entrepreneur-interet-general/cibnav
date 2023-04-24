@@ -10,6 +10,7 @@ Ce dag a pour objet la création d'un dataset
 
 Ce DAG peut être executé seulement à l'intérieur du Ministère de la Transition Ecologique Et Solidaire.
 """
+import os
 import pickle
 from datetime import datetime
 
@@ -24,6 +25,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.linear_model import PoissonRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
+
 
 INPUT_VISITS_PARAMS = [
     "id_nav_flotteur",
@@ -129,6 +131,7 @@ def exporter_df(df: pd.DataFrame, engine, indexes: list = []):
 
 def trie_dataset(df):
     """Retourne un dataset groupé par navire, trié par date de visite"""
+
     df = df.set_index(["id_nav_flotteur", "date_visite"])
     df = df.sort_index()
     return df.reset_index()
@@ -234,7 +237,6 @@ def lag_variable_by_year(data, variable):
         on=["id_nav_flotteur", "annee_visite"],
         how="left",
     )
-
     return df
 
 
@@ -324,6 +326,7 @@ def process_dataset(prediction_phase=False):
     df["idc_gin_categ_navigation"] = recode_categ(df["idc_gin_categ_navigation"])
     df["materiau_coque"] = recode_materiau_coque(df["materiau_coque"])
     df["type_moteur"] = recode_type_moteur(df["type_moteur"])
+
 
     if not prediction_phase:  ## Pour l entrainement du modele
         df = creation_cibles(df)
@@ -472,6 +475,7 @@ def feature_contributions(model_pipe, data):
 
 
 ## Début Quatrieme Task - Prévision sur la flotte actuelle et priorisation
+
 def prediction_flotte():
     engine = connection_db()
     df = chargement_dataset(

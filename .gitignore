@@ -5,4 +5,7 @@ debug.log
 .env.server
 /dump
 docker
+
+# Cache directories
 __pycache__
+notebooks/*_cache
