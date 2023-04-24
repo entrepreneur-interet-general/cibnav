@@ -383,7 +383,9 @@ def create_preprocessing_pipeline():
 
     log_preprocessing = Pipeline(
         steps=[
-            (FunctionTransformer(np.log1p)),
+            ("imputer_num", SimpleImputer(strategy="mean")),
+            ("log_transform", FunctionTransformer(np.log1p)),
+            ("scaler", StandardScaler()),
         ]
     )
 
@@ -394,11 +396,16 @@ def create_preprocessing_pipeline():
         ]
     )
 
+    breakpoint()
     preprocess = ColumnTransformer(
         [
             ("categorical_preprocessing", categorical_preprocessing, OUTPUT_CAT_PARAM),
-            ("log transformation", log_preprocessing, LOG_PARAM),
-            ("numerical_preprocessing", numeric_preprocessing, OUTPUT_NUM_PARAM),
+            (
+                "numerical_preprocessing",
+                numeric_preprocessing,
+                [v for v in OUTPUT_NUM_PARAM if v not in LOG_PARAM],
+            ),
+            ("log_transformation", log_preprocessing, LOG_PARAM),
         ]
     )
     return preprocess
@@ -423,7 +430,7 @@ def train():
     model = model_pipe.fit(x, y)
 
     # Saving model
-    pickle.dump(model, open("/opt/etl/airflow/modeles/cibnav_ml_v4.pkle", "wb"))
+    pickle.dump(model, open("./dump/cibnav_ml_v4.pkle", "wb"))
 
 
 ## Début Troisième Task - Génération d un jeu de donnees qui simule pour chaque navire une visite de securite aujourd hui
@@ -459,6 +466,8 @@ def prediction_flotte():
     model_pipe = pickle.load(open("./dump/cibnav_ml_v4.pkle", "rb"))
     y_pred = predict_cible(model_pipe, df)
     previsions["prevision"] = y_pred
+
+    breakpoint()
 
     previsions = previsions.sort_values(by="prevision", ascending=False)
     previsions["ranking"] = np.arange(start=1, stop=len(previsions) + 1)
