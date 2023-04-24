@@ -381,11 +381,11 @@ def create_preprocessing_pipeline():
         ]
     )
 
-    # log_preprocessing = Pipeline(
-    #     steps=[
-    #         (FunctionTransformer(np.log1p)),
-    #     ]
-    # )
+    log_preprocessing = Pipeline(
+        steps=[
+            (FunctionTransformer(np.log1p)),
+        ]
+    )
 
     numeric_preprocessing = Pipeline(
         steps=[
@@ -407,30 +407,9 @@ def create_preprocessing_pipeline():
 def train():
     engine = connection_db()
 
-    df = chargement_dataset(engine, prediction_phase=False)
-
-    del df["id_gin_visite"]
-    del df["id_nav_flotteur"]
-
-    df = df[
-        [
-            # cible
-            "cible",
-            # prescriptions passées
-            "nombre_prescriptions_majeurs_hist",
-            "nombre_prescriptions_hist",
-            # Caractéristiques du navire
-            "age",
-            "longueur_hors_tout",
-            "puissance_administrative",
-            "type_moteur",
-            "materiau_coque",
-            # Usage du navire
-            "situation_flotteur",
-            "genre_navigation",
-            "idc_gin_categ_navigation",
-        ]
-    ]
+    df = chargement_dataset(
+        engine, columns=OUTPUT_NUM_PARAM + OUTPUT_CAT_PARAM, prediction_phase=False
+    )
 
     model_pipe = Pipeline(
         [
