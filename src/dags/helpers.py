@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from airflow.models import Variable
 from airflow.operators.bash_operator import BashOperator
-from dotenv import load_dotenv
+from dotenv import load_dotenv, dotenv_values
 from hashlib import sha1
 from sqlalchemy import create_engine
 import os
@@ -42,30 +42,10 @@ def yesterday_date():
     return datetime.now() - timedelta(days=1)
 
 
-def default_env():
-    # Fetching the variables stored in config.json
-    ocan_config = Variable.get("cibnav-ocan-config", deserialize_json=True)
-    return {
-        # PostgreSQL
-        'EMBULK_POSTGRESQL_HOST'     : os.environ['EMBULK_POSTGRESQL_HOST'],
-        'EMBULK_POSTGRESQL_USER'     : os.environ['EMBULK_POSTGRESQL_USER'],
-        'EMBULK_POSTGRESQL_DB'       : os.environ['EMBULK_POSTGRESQL_DB'],
-        'EMBULK_POSTGRESQL_PORT'     : os.environ['EMBULK_POSTGRESQL_PORT'],
-        'EMBULK_POSTGRESQL_PASSWORD' : os.environ['EMBULK_POSTGRESQL_PASSWORD'],
-        # Oracle
-        'EMBULK_ORACLE_DRIVER_PATH'   : ocan_config['EMBULK_ORACLE_DRIVER_PATH'],
-        'EMBULK_ORACLE_HOST'          : ocan_config['EMBULK_ORACLE_HOST'],
-        'EMBULK_ORACLE_OCAN_USER'     : ocan_config['EMBULK_ORACLE_OCAN_USER_CIBLAGE'],
-        'EMBULK_ORACLE_OCAN_DATABASE' : ocan_config['EMBULK_ORACLE_OCAN_DATABASE'],
-        'EMBULK_ORACLE_OCAN_PASSWORD' : os.environ['EMBULK_ORACLE_OCAN_PASSWORD_CIBLAGE'],
-
-    }
-
-
 def resolve_env(env):
     if type(env) == dict:
-        return {**(default_env()), **env}
-    return default_env()
+        return {**(dotenv_values()), **env}
+    return dotenv_values()()
 
 
 def embulk_run(dag, script, table, env=None, task_id=None):

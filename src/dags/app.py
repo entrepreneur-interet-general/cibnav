@@ -327,6 +327,7 @@ def process_dataset(prediction_phase=False):
     df["materiau_coque"] = recode_materiau_coque(df["materiau_coque"])
     df["type_moteur"] = recode_type_moteur(df["type_moteur"])
 
+    # TODO : Supprimer les paramètres non utiles pour le modèle
 
     if not prediction_phase:  ## Pour l entrainement du modele
         df = creation_cibles(df)
@@ -471,10 +472,28 @@ def feature_contributions(model_pipe, data):
     n_features = preprocessed_data.shape[1]
     multiplier = np.zeros((n_features, n_features), np.float64)
     np.fill_diagonal(multiplier, model_pipe["Poisson glm"].coef_)
-    return np.exp(np.matmul(preprocessed_data, multiplier))
+
+    # create a list of all the column names
+    column_names = (
+        model_pipe["preprocess"]
+        .named_transformers_["categorical_preprocessing"]
+        .named_steps["ohe"]
+        .get_feature_names(OUTPUT_CAT_PARAM)
+        .tolist()
+    )
+    column_names += [
+        f"{col}_numeric" for col in OUTPUT_NUM_PARAM if col not in LOG_PARAM
+    ]
+    column_names += [f"{col}_log" for col in LOG_PARAM]
+
+    df = pd.DataFrame(
+        np.exp(np.matmul(preprocessed_data, multiplier)), columns=column_names
+    )
+    return df
 
 
 ## Début Quatrieme Task - Prévision sur la flotte actuelle et priorisation
+
 
 def prediction_flotte():
     engine = connection_db()
@@ -493,7 +512,17 @@ def prediction_flotte():
     y_pred = predict_cible(model_pipe, df)
     previsions["prevision"] = y_pred
 
+    previsions = previsions.reset_index()
+
+    # Ajout de la contribution de chaque paramètre
     contribs = feature_contributions(model_pipe, df)
+
+    # Selection de la colonne ayant la contribution la plus importante
+    contribs["feature_importance_1"] = contribs.idxmax(axis=1)
+    previsions = previsions.merge(
+        contribs["feature_importance_1"], left_index=True, right_index=True
+    )
+    previsions = previsions.set_index("id_nav_flotteur")
 
     previsions = previsions.sort_values(by="prevision", ascending=False)
     previsions["ranking"] = np.arange(start=1, stop=len(previsions) + 1)

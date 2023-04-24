@@ -10,3 +10,4 @@ scipy
 pyscaffold
 python-dotenv
 requests
+scikit-learn
