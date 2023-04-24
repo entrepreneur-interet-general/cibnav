@@ -396,7 +396,6 @@ def create_preprocessing_pipeline():
         ]
     )
 
-    breakpoint()
     preprocess = ColumnTransformer(
         [
             ("categorical_preprocessing", categorical_preprocessing, OUTPUT_CAT_PARAM),
@@ -466,8 +465,6 @@ def prediction_flotte():
     model_pipe = pickle.load(open("./dump/cibnav_ml_v4.pkle", "rb"))
     y_pred = predict_cible(model_pipe, df)
     previsions["prevision"] = y_pred
-
-    breakpoint()
 
     previsions = previsions.sort_values(by="prevision", ascending=False)
     previsions["ranking"] = np.arange(start=1, stop=len(previsions) + 1)
