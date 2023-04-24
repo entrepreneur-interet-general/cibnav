@@ -444,7 +444,7 @@ def train():
     model = model_pipe.fit(x, y)
 
     # Saving model
-    pickle.dump(model, open("/opt/etl/airflow/modeles/cibnav_ml_v3.pkle", "wb"))
+    pickle.dump(model, open("/opt/etl/airflow/modeles/cibnav_ml_v4.pkle", "wb"))
 
 
 ## Début Troisième Task - Génération d un jeu de donnees qui simule pour chaque navire une visite de securite aujourd hui
@@ -477,7 +477,7 @@ def prediction_flotte():
 
     del df["id_nav_flotteur"]
 
-    model_pipe = pickle.load(open("./dump/cibnav_ml_v3.pkle", "rb"))
+    model_pipe = pickle.load(open("./dump/cibnav_ml_v4.pkle", "rb"))
     y_pred = predict_cible(model_pipe, df)
     previsions["prevision"] = y_pred
 
