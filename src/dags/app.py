@@ -446,9 +446,32 @@ def export_dataset_predict():
     df.to_sql("dataset_predict", engine, if_exists="replace", index=False)
 
 
+def feature_contributions(model_pipe, data):
+    """Calcul des contributions de chaque variable au score final
+
+    Cette fonction multiplie les coefficients du modèle avec chaque variable
+    de chaque observation, puis passe à l'exponentielle.
+
+    Il en résulte des contributions multiplicatives à la prédiction finale,
+    c'est à dire qu'une contribution de 1.2 peut s'interpréter comme "Fait
+    augmenter de 20% la prédiction".
+
+    Params:
+    - model_pipe: pipeline sklearn entraînée, avec étapes "preprocess"
+      (préparation des données) et "Poisson glm" (modèle).
+    - data: données sur lesquels décomposer la prédiction.
+
+    Return: np.array. Matrice des contributions individuelles de chaque
+    feature pour chaque observation. Dimension : (n observation * k features).
+    """
+    preprocessed_data = model_pipe["preprocess"].transform(data).todense()
+    n_features = preprocessed_data.shape[1]
+    multiplier = np.zeros((n_features, n_features), np.float64)
+    np.fill_diagonal(multiplier, model_pipe["Poisson glm"].coef_)
+    return np.exp(np.matmul(preprocessed_data, multiplier))
+
+
 ## Début Quatrieme Task - Prévision sur la flotte actuelle et priorisation
-
-
 def prediction_flotte():
     engine = connection_db()
     df = chargement_dataset(
@@ -465,6 +488,8 @@ def prediction_flotte():
     model_pipe = pickle.load(open("./dump/cibnav_ml_v4.pkle", "rb"))
     y_pred = predict_cible(model_pipe, df)
     previsions["prevision"] = y_pred
+
+    contribs = feature_contributions(model_pipe, df)
 
     previsions = previsions.sort_values(by="prevision", ascending=False)
     previsions["ranking"] = np.arange(start=1, stop=len(previsions) + 1)
