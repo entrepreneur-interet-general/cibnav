@@ -183,6 +183,31 @@ def recode_categ(categ):
     return categ.replace(mapping)
 
 
+def recode_materiau_coque(materiau_coque):
+    mapping = {
+        "AG/4 - ALU": "METAL",
+        "ACIER": "METAL",
+        "ACIER / INOX": "METAL",
+        "ALLIAGE LEGER": "METAL",
+        "BOIS MASSIF": "BOIS",
+        "BOIS MOULE": "BOIS",
+        "CONTREPLAQUE": "BOIS",
+        "POLYESTER EPOXY": "PLASTIQUE",
+        "POLYETHYLENE": "PLASTIQUE",
+        "PLASTIQUE SANDWICH": "PLASTIQUE",
+        "INCONNU": None,
+    }
+
+    return materiau_coque.replace(mapping)
+
+
+def recode_type_moteur(type_moteur):
+    type_moteur.loc[
+        np.logical_and(type_moteur != "Explosion", type_moteur != "Combustion interne")
+    ] = "Autre"
+    return type_moteur
+
+
 def lag_variable_by_year(data, variable):
     """
     Cette fonction permet de créer une nouvelle variable (avec le suffixe
@@ -231,9 +256,6 @@ def creation_visite_simulee(visites):
             "annee_construction": visites[visites["id_nav_flotteur"] == navire][
                 "annee_construction"
             ].max(),
-            "nombre_moteur": visites[visites["id_nav_flotteur"] == navire][
-                "nombre_moteur"
-            ].max(),
             "nombre_prescriptions_majeurs": 0,
         }
         for param in OUTPUT_CAT_PARAM + OUTPUT_NUM_PARAM:
@@ -248,7 +270,7 @@ def creation_visite_simulee(visites):
                 ligne[param] = visites[visites["id_nav_flotteur"] == navire][
                     param
                 ].max()
-        tmp = tmp.append(ligne, ignore_index=True)
+        tmp = pd.concat([tmp, pd.DataFrame([ligne])], ignore_index=True)
     return tmp
 
 
@@ -300,6 +322,8 @@ def process_dataset(prediction_phase=False):
     del df["annee_construction"]
 
     df["idc_gin_categ_navigation"] = recode_categ(df["idc_gin_categ_navigation"])
+    df["materiau_coque"] = recode_materiau_coque(df["materiau_coque"])
+    df["type_moteur"] = recode_type_moteur(df["type_moteur"])
 
     if not prediction_phase:  ## Pour l entrainement du modele
         df = creation_cibles(df)
@@ -312,19 +336,26 @@ def process_dataset(prediction_phase=False):
 ## Début Seconde Task - Entrainement du modele de machine learning
 
 
-def chargement_dataset(engine, database="dataset_train", prediction_phase=False):
-    beginning_query = "select id_nav_flotteur, id_gin_visite, longueur_hors_tout, genre_navigation, jauge_oslo, nombre_moteur, num_version, puissance_administrative, materiau_coque, situation_flotteur, type_carburant, type_moteur, annee_visite, sitrep_history, nombre_prescriptions_hist, nombre_prescriptions_majeurs_hist, age, delai_visites"
+def chargement_dataset(
+    engine, columns, database="dataset_train", prediction_phase=False
+):
+    query = f"select {', '.join(columns)}"
     ## Renvoi de la cible pour entrainement modele
     if not prediction_phase:
-        df = pd.read_sql("{}, cible  from {}".format(beginning_query, database), engine)
+        df = pd.read_sql("{}, cible  from {}".format(query, database), engine)
     else:
-        df = pd.read_sql("{} from {}".format(beginning_query, database), engine)
+        df = pd.read_sql("{} from {}".format(query, database), engine)
 
-    df["situation_flotteur"] = df["situation_flotteur"].astype(str)
-    df["genre_navigation"] = df["genre_navigation"].astype(str)
-    df["type_moteur"] = df["type_moteur"].astype(str)
-    df["type_carburant"] = df["type_carburant"].astype(str)
-    df["materiau_coque"] = df["materiau_coque"].astype(str)
+    if "situation_flotteur" in df:
+        df["situation_flotteur"] = df["situation_flotteur"].astype(str)
+    if "genre_navigation" in df:
+        df["genre_navigation"] = df["genre_navigation"].astype(str)
+    if "type_moteur" in df:
+        df["type_moteur"] = df["type_moteur"].astype(str)
+    if "type_carburant" in df:
+        df["type_carburant"] = df["type_carburant"].astype(str)
+    if "materiau_coque" in df:
+        df["materiau_coque"] = df["materiau_coque"].astype(str)
     return df
 
 
@@ -339,9 +370,7 @@ def split_target(df, prediction_phase=False):
 
 def predict_cible(model, X):
     y_pred = model.predict(X)
-    y_pred_prob_tmp = model.predict_proba(X)
-    y_prob_pred = [item[1] for item in y_pred_prob_tmp]
-    return y_pred, y_prob_pred
+    return y_pred
 
 
 def create_preprocessing_pipeline():
@@ -352,7 +381,11 @@ def create_preprocessing_pipeline():
         ]
     )
 
-    log_preprocessing = Pipeline(steps=[(FunctionTransformer(np.log1p))])
+    # log_preprocessing = Pipeline(
+    #     steps=[
+    #         (FunctionTransformer(np.log1p)),
+    #     ]
+    # )
 
     numeric_preprocessing = Pipeline(
         steps=[
@@ -435,31 +468,29 @@ def prediction_flotte():
     engine = connection_db()
     df = chargement_dataset(
         engine,
+        columns=OUTPUT_NUM_PARAM + OUTPUT_CAT_PARAM + ["id_nav_flotteur"],
         database="dataset_predict",
-        index="id_nav_flotteur",
         prediction_phase=True,
     )
 
     previsions = pd.DataFrame(index=df.id_nav_flotteur)
 
-    del df["id_gin_visite"]
     del df["id_nav_flotteur"]
 
-    model_pipe = pickle.load(open("/opt/etl/airflow/modeles/cibnav_ml_v3.pkle", "rb"))
-    y_pred, y_prob_pred = predict_cible(model_pipe, df)
+    model_pipe = pickle.load(open("./dump/cibnav_ml_v3.pkle", "rb"))
+    y_pred = predict_cible(model_pipe, df)
     previsions["prevision"] = y_pred
-    previsions["probabilite"] = y_prob_pred
 
-    previsions = previsions.sort_values(by="probabilite", ascending=False)
+    previsions = previsions.sort_values(by="prevision", ascending=False)
     previsions["ranking"] = np.arange(start=1, stop=len(previsions) + 1)
     previsions.to_sql(
-        "score_v3",
+        "score_v4",
         engine,
         if_exists="replace",
     )
 
 
-## Definition des task Aiflow
+## Definition des task Airflow
 
 task_process_data = PythonOperator(
     task_id="process_training_data",
