@@ -526,6 +526,16 @@ def prediction_flotte():
 
     previsions = previsions.sort_values(by="prevision", ascending=False)
     previsions["ranking"] = np.arange(start=1, stop=len(previsions) + 1)
+
+    # Transformation de la cible en fréquence
+    threshold = previsions["prevision"].quantile(0.4)
+    previsions["frequency"] = previsions.prevision.apply(
+        lambda x: 2 if x < threshold else 1
+    )
+    previsions["frequency_max"] = previsions.prevision.apply(
+        lambda x: 2.5 if x < threshold else 1.5
+    )
+
     previsions.to_sql(
         "score_v4",
         engine,
