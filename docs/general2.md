@@ -1,9 +1,9 @@
 
 # Présentation générale
 ::: tip Nouvelle version de CibNav
-CibNav a évolué vers CibNav V3. 
+CibNav a évolué vers CibNav V4. 
 
-Vous pouvez voir un résumé des modifications apportées et des motivations de CibNav V3 en cliquant [ici](./evolution_cibnav_v2.md#)
+Vous pouvez voir un résumé des modifications apportées et des motivations de CibNav V4 en cliquant [ici](./evolution_cibnav_v2.md#)
 :::
 
 Le logiciel CibNav est un outil d'aide à la décision pour la réalisation des visites de sécurité dites ciblées, 
