@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Fact sheet</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <img src="logo.png" width="200" height="150">
+  <body>
+    <table>
+      <tr>
+        <td>
+          <b>Nom :</b> CIBNAV
+        </td>
+        <td>
+          <b>Éditeur :</b> Direction Générale des Affaires Maritimes de la Pêche et de l'Acquaculture
+        </td>
+        <td>
+          <b>Version :</b> 4.0.0
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <b>Approbation :</b> CIBNAV
+        </td>
+        <td>
+          <b>Approbateur :</b> Bureau STEN
+        </td>
+        <td>
+          <b>Màj :</b> 26-04-2023
+        </td>
+      </tr>
+    </table>
+    <table>
+      <tr>
+        <td>
+          <b>Résumé :</b> CibNav est un outil de ciblage permettant d’orienter les visites de sécurité pour les navires professionnels français de moins de 24 mètres, à l’usage des inspecteurs de sécurité.
+        </td>
+      </tr>
+    </table>
+    <table>
+      <tr> <h2>Mécanismes</h2> </tr>
+
+      <tr>
+        <td><b>Cible d'apprentissage :</b></td>
+        <td>nombre de prescription délivrés lors d'une visite pour un navire</td>
+      </tr>
+      <tr>
+      <td><b>Sortie :</b></td>
+        <td>probabilité de recevoir au moins 4 prescriptions pour une visite au
+          jour J</td>
+      </tr>
+      <tr>
+        <td><b>Périmètre d'application :</b></td>
+        <td>navires professionnels français < 24m</td>
+      </tr>
+      <tr>
+        <td><b>Périodicité de la prédiction :</b></td>
+        <td>A la demande</td>
+      </tr>
+      <tr>
+        <td><b>Source des données d'entrée :</b></td>
+        <td>NAVPRO, GINA</td>
+      </tr>
+      <tr>
+        <td><b>Mode de collecte :</b></td>
+        <td>Les prescriptions sont renseignées par les inspecteurs lors de la visite de sécurité d'un navire. Les données statiques du navire sont des données légales. Les données d'accidentologie sont renseignées par les agents de CROSS, à la réception d’alertes.</td>
+      </tr>
+      <tr>
+        <td><b>Type des données :</b></td>
+        <td>nombre de prescriptions sur visites, données statiques descriptives des navires, données d’accidentologie</td>
+      </tr>
+      <tr>
+        <td><b>Zone géographique :</b></td>
+        <td>France entière</td>
+      </tr>
+      <tr>
+        <td><b>Nombre d'observations :</b></td>
+        <td>52 271 visites historiques (11 736 pos / 40 535 neg)</td>
+      </tr>
+      <tr>
+        <td><b>Période :</b></td>
+        <td>mai 2016 à avril 2023</td>
+      </tr>
+      <tr>
+        <td><b>Modèle entraîné :</b></td>
+        <td>Loi de Poisson</td>
+      </tr>
+    </table>
+    <table>
+
+      <tr>
+        <h2>Performance </h2>
+      </tr>
+      <thead>
+        <td> </td> <td> AUCPR </td> <td> F1-score </td> <td> Précision </td> <td> Rappel</td>
+      </thead>
+      <tr>
+        <td> <b>Classificateur simple : </b></td> <td>0.22</td> <td>0.23</td> <td> 0.23 </td> <td> 0.22</td>
+      </tr>
+      <tr>
+        <td> <b>version antérieure : </b></td> <td> NA </td> <td> NA </td> <td> NA
+        </td> <td> NA </td>
+      </tr>
+      <tr>
+        <td> <b>sur échantillon d'entraînement :</b></td> <td> 0.91 </td> <td> 0.81
+        </td> <td> 0.70 </td> <td> 0.96 </td>
+      </tr>
+      <tr>
+        <td> <b>sur échantillon de validation : </b></td> <td> 0.73 </td> <td> 0.73
+        </td> <td> 0.70 </td> <td> 0.87 </td>
+      </tr>
+    </table>
+    <table>
+      <tr> <h2> Conseils d'utilisation </h2> </tr>
+      <tr>
+        <td><b>Bénéfices : </b></td>
+        <td>Permet de cibler les navires à risque afin d'assister les inspecteurs de sécurité (par exemple : navires dont les inspecteurs possèdent peu d’informations, nouvel agent…)</td>
+      </tr>
+      <tr>
+        <td><b>Cas d'usages : </b></td>
+        <td>Chaque inspecteur a accès aux navires de sa zone, classés du plus riqué au moins risqué selon le modèle. Lorsqu’il établit son planning de visite, il peut s’aider de cette liste pour selectionner des navires.</td>
+      </tr>
+      <tr>
+        <td> <b>Utilisation : </b></td>
+        <td>Ce modèle est uniquement destiné à une utilisation par des inspecteurs de sécurité pour établir un planning de visite. C’est une aide à la décision complémentaire à l’expérience de l’inspecteur.</td>
+      </tr>
+      <tr>
+        <td> <b>Appui à la décision : </b></td>
+        <td>L’inspecteur identifie un navire en haut de la liste. Il croise ses connaissances aux données consultables sur ce navire pour valider ou invalider la pertinence d’une visite.</td>
+      </tr>
+      <tr>
+        <td> <b>Avant utilisation : </b></td>
+        <td>L’inspecteur doit impérativement prendre connaissance de cette fiche. Ensuite, il confronte le modèle à ses connaissances en prenant comme exemple plusieurs navires qu’il a déjà visité, et qu’il connaît bien.</td>
+      </tr>
+    </table>
+    <table>
+      <tr> <h2> Précautions d'utilisation </h2> </tr>
+      <tr>
+        <td> <b>Risques : </b></td>
+        <td> Non stationnarité de l'environnement : Le modèle est entrainé sur des visites régulières mais sera appliqué dans un cadre de visites ciblés. Le modèle ne pourra pas tenir compte des évolution de comportement de maintenance, liés à ce changement réglementaire. Le modèle pourra être ajusté une fois suffisament de données Collectées sur le nouveau contexte réglementaire. </td>
+      </tr>
+      <tr>
+        <td> <b>Utilisation inapropriee : </b></td>
+        <td> L’outil n’a pas vocation à être prescriptif. Il ne peut se substituer et ne doit pas influencer un diagnostic réalisé par un inspecteur. </td>
+      </tr>
+      <tr>
+        <td><b>Cesser utilisation :</b></td>
+        <td>Lorsque les informations métiers contredisent le modèle. Dans ce cas, faire remonter l'information pour améliorer l'outil.</td>
+      </tr>
+    </table>
+
+    <table>
+      <tr> <h2> Autres informations </h2> </tr>
+      <tr>
+        <td> <b>Impact observé : </b></td>
+        <td> Le modèle n’a pas été testé en condition réelle</td>
+      </tr>
+      <tr>
+        <td> <b>Code : </b></td>
+        <td> <a href='https://github.com/entrepreneur-interet-general/cibnav'> Dépôt github </a> </td>
+      </tr>
+      <tr>
+        <td> <b>Fondements juridiques : </b></td>
+        <td> 2ème volet de la réforme de l’inspection des navires </td>
+      </tr>
+      <tr>
+        <td> <b>Pour toute demande : </b></td>
+        <td> team@multi.coop (technique) ou sebastien.verdeau@developpement-durable.gouv.fr (métier)</td>
+      </tr>
+    </table>
+    </br>
+  </body>
+</html>
