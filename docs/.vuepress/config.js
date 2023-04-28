@@ -23,7 +23,7 @@ sidebar = [
 module.exports = {
   theme: 'gouv-fr',
   base: '/cibnav/',
-  title: 'Documentation CibNav V3',
+  title: 'Documentation CibNav',
   description: "Ciblage des contrôles pour navires professionnels",
   head: [
     ['meta', { name: 'theme-color', content: '#0053b3' }],
