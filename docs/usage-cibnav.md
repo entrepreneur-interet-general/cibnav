@@ -1,5 +1,9 @@
 # L’usage de CibNav pour les visites de sécurité
 
+Il est primordial de prendre connaissance de ces quelques éléments, et de 
+consulter la [fiche d'identité de l'algorithme](https://multi-coop.gitlab.io/CIBNAV/fact_sheet.html) pour 
+pouvoir utiliser CibNav à bon escient. 
+
 La visualisation de CibNav est prévue pour faciliter l’aide à la décision de l’ISNPRPM sur la priorisation des navires à inspecter. Ce postulat recherché se traduit par les deux critères suivants :
 
 - Simplicité d’utilisation
@@ -24,4 +28,3 @@ CibNav bien entendu en tant qu’aide à la décision n’a pas vocation à affi
 navires déterminées au niveau national et leur application régionale et locale, son fonctionnement n’étant pas 
 adapté à cet usage. Ce pilotage relève en effet du contrôle administratif, déterminé par voie réglementaire en 
 application du décret n°84-810 (c’est-à-dire par arrêté, instructions et/ou consignes).
-

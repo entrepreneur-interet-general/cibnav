@@ -1,4 +1,3 @@
-
 # Présentation générale
 ::: tip Nouvelle version de CibNav
 CibNav a évolué vers CibNav V4. 
