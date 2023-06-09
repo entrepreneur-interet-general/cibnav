@@ -8,8 +8,7 @@ Vous pouvez voir un résumé des modifications apportées et des motivations de 
 Le logiciel CibNav est un outil d'aide à la décision pour la réalisation des visites de sécurité dites ciblées, 
 (effectuées en application du décret n°84-810 modifié), via une identification des navires présentant la plus grande probabilité d'écart à la réglementation.
 
-Cibnav est un logiciel basé sur des algorithmes alimentés par les données issues des visites de sécurité enregistrées sous la base de données Gina 
-et des évènements de mer (SITREP) issues des bases de données des CROSS.
+Cibnav est un logiciel basé sur des algorithmes alimentés par les données issues des visites de sécurité enregistrées sous la base de données Gina.
 
 Son livrable est un tableau de bord pour les ISN listant les navires en fonction de leur priorité à réaliser une visite de sécurité.
 
