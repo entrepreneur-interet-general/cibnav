@@ -8,6 +8,8 @@ La documentation de l'outil, des variables et du modèle est disponible
 La source en markdown est dans le dossier "docs", et la documentation est 
 mise-à-jour en cas de changement à chaque push. 
 
+L'alogithme est documenté dans cette [fiche d'identité](https://multi-coop.gitlab.io/CIBNAV/fact_sheet.html) qui reprend les recommendations d'Etalab.
+
 ## Data Engineering For CibNav
 
 Utiliser Python3
